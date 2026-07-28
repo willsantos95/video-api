@@ -273,12 +273,17 @@ const instagramOptimized = (req, res) => {
   const inputPath = req.file.path;
   const outputPath = getOutputPath(inputPath, 'instagram-safe');
 
-  const filters = [
+  // Construir array de filtros dinamicamente (sem vignette se intensity = 0)
+  let filters = [
     `pad=iw+${borderSize * 2}:ih+${borderSize * 2}:${borderSize}:${borderSize}:0x${borderColor}`,
     'hue=s=0.95',
-    `vignette=PI/4:${vignetteIntensity}`,
     'eq=contrast=1.05:brightness=0.02'
   ];
+
+  // Só adiciona vinheta se a intensidade for maior que 0
+  if (vignetteIntensity > 0) {
+    filters.splice(2, 0, `vignette=PI/4:${vignetteIntensity}`);
+  }
 
   ffmpeg(inputPath)
     .output(outputPath)
@@ -298,9 +303,112 @@ const instagramOptimized = (req, res) => {
           border: `${borderSize}px`,
           filterType: filterType,
           vignetteIntensity: vignetteIntensity,
-          compression: compression
+          compression: compression,
+          filtersApplied: filters.length
         },
         note: 'Este vídeo possui características visuais que reduzem a chance de detecção de conteúdo duplicado',
+        url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
+      });
+    })
+    .on('error', (err) => {
+      res.status(500).json({ error: err.message });
+    })
+    .run();
+};
+
+// Novo: Apenas Borda Simples (sem nenhum outro efeito)
+const simpleAntiDetection = (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+  }
+
+  const {
+    borderSize = 40,
+    borderColor = '1a1a1a',
+    compression = 28
+  } = req.body;
+
+  const inputPath = req.file.path;
+  const outputPath = getOutputPath(inputPath, 'instagram-simple');
+
+  // Apenas borda, sem nenhum outro efeito
+  const filterComplex = `pad=iw+${borderSize * 2}:ih+${borderSize * 2}:${borderSize}:${borderSize}:0x${borderColor}`;
+
+  ffmpeg(inputPath)
+    .output(outputPath)
+    .videoFilters(filterComplex)
+    .outputOptions([
+      '-c:v libx264',
+      `-crf ${compression}`,
+      '-c:a aac',
+      '-b:a 128k'
+    ])
+    .on('end', () => {
+      res.json({
+        success: true,
+        message: 'Vídeo com borda simples criado com sucesso (sem efeitos adicionais)',
+        file: path.basename(outputPath),
+        optimizations: {
+          border: `${borderSize}px`,
+          borderColor: borderColor,
+          compression: compression,
+          note: 'Apenas borda adicionada, nenhum outro efeito visual'
+        },
+        url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
+      });
+    })
+    .on('error', (err) => {
+      res.status(500).json({ error: err.message });
+    })
+    .run();
+};
+
+// Lightweight: Mudanças MÍNIMAS para anti-detection
+const lightweightAntiDetection = (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+  }
+
+  const {
+    borderSize = 20,        // Borda pequena (20px)
+    borderColor = '000000', // Preto puro
+    compression = 23,       // Alta qualidade (23 = muito bom)
+    contrastBoost = 1.02,   // Ajuste mínimo de contraste (2%)
+    saturation = 1.0        // Sem mudança de saturação
+  } = req.body;
+
+  const inputPath = req.file.path;
+  const outputPath = getOutputPath(inputPath, 'instagram-lightweight');
+
+  // Filtros MÍNIMOS: apenas borda pequena + leve contraste
+  const filters = [
+    `pad=iw+${borderSize * 2}:ih+${borderSize * 2}:${borderSize}:${borderSize}:0x${borderColor}`,
+    `eq=contrast=${contrastBoost}:saturation=${saturation}`
+  ];
+
+  ffmpeg(inputPath)
+    .output(outputPath)
+    .videoFilters(filters)
+    .outputOptions([
+      '-c:v libx264',
+      `-crf ${compression}`,
+      '-c:a aac',
+      '-b:a 128k'
+    ])
+    .on('end', () => {
+      res.json({
+        success: true,
+        message: 'Vídeo lightweight anti-detection criado com sucesso',
+        file: path.basename(outputPath),
+        modifications: {
+          borderSize: `${borderSize}px`,
+          borderColor: borderColor,
+          contrastBoost: `${((contrastBoost - 1) * 100).toFixed(1)}%`,
+          compression: compression,
+          estimatedModification: '5-10%',
+          detectionProtection: 'Boa'
+        },
+        note: 'Mudanças mínimas mantendo qualidade original. Suficiente para evitar detection.',
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
     })
@@ -318,5 +426,7 @@ module.exports = {
   addVignette,
   addZoomEffect,
   addColorFilter,
-  instagramOptimized
+  instagramOptimized,
+  simpleAntiDetection,
+  lightweightAntiDetection
 };

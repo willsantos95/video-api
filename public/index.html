@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎬 Video API Tester - Anti-Detection Instagram</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #ff6b6b;
+            --secondary: #4ecdc4;
+            --dark: #1a1a1a;
+            --light: #f5f5f5;
+            --border: #e0e0e0;
+            --success: #51cf66;
+            --warning: #ffd93d;
+            --error: #ff6b6b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: var(--dark);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 40px;
+        }
+
+        @media (max-width: 1024px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .section {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section h2 {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed var(--secondary);
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f0fffe;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: #fff5f5;
+        }
+
+        .upload-area.dragover {
+            border-color: var(--primary);
+            background: #fff5f5;
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .upload-text {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        #videoInput {
+            display: none;
+        }
+
+        .video-preview {
+            margin-top: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f5f5f5;
+        }
+
+        .video-preview video {
+            width: 100%;
+            display: block;
+            background: black;
+        }
+
+        .video-info {
+            background: #f5f5f5;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+
+        .video-info div {
+            margin: 5px 0;
+            color: #666;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95em;
+            color: #999;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            color: var(--secondary);
+        }
+
+        .tab.active {
+            color: var(--secondary);
+            border-bottom-color: var(--secondary);
+        }
+
+        /* Endpoint Config */
+        .endpoint-config {
+            display: none;
+        }
+
+        .endpoint-config.active {
+            display: block;
+        }
+
+        .param-group {
+            margin-bottom: 20px;
+        }
+
+        .param-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--dark);
+            font-size: 0.9em;
+        }
+
+        .param-group input,
+        .param-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9em;
+            transition: border-color 0.3s ease;
+        }
+
+        .param-group input:focus,
+        .param-group select:focus {
+            outline: none;
+            border-color: var(--secondary);
+            box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.1);
+        }
+
+        .param-hint {
+            font-size: 0.8em;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        /* Buttons */
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--light);
+            color: var(--dark);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        /* Status Messages */
+        .status-message {
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            display: none;
+            font-size: 0.9em;
+        }
+
+        .status-message.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid var(--success);
+        }
+
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid var(--error);
+        }
+
+        .status-message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 4px solid var(--secondary);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Loading */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Comparison */
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .video-container {
+            background: #f5f5f5;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .video-container h3 {
+            background: var(--border);
+            padding: 10px 15px;
+            font-size: 0.9em;
+            margin: 0;
+        }
+
+        .video-container video {
+            width: 100%;
+            display: block;
+            background: black;
+            max-height: 300px;
+            object-fit: contain;
+        }
+
+        .download-btn {
+            width: 100%;
+            padding: 10px;
+            background: var(--success);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .download-btn:hover {
+            background: #40c057;
+        }
+
+        .download-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* API URL */
+        .api-url-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: var(--light);
+            border-radius: 6px;
+        }
+
+        .api-url-section label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+
+        .api-url-section input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-family: monospace;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #1565c0;
+            margin: 15px 0;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stat {
+            background: var(--light);
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .stat strong {
+            display: block;
+            color: var(--secondary);
+        }
+
+        .footer {
+            background: var(--light);
+            padding: 20px;
+            text-align: center;
+            font-size: 0.85em;
+            color: #666;
+            border-top: 1px solid var(--border);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 Video API Tester</h1>
+            <p>Teste todas as funcionalidades de edição de vídeo e proteção anti-detection</p>
+        </div>
+
+        <div class="content">
+            <!-- Left Column: Upload e Seleção -->
+            <div class="section">
+                <h2>📤 Upload & Seleção</h2>
+
+                <div class="api-url-section">
+                    <label for="apiUrl">URL da API:</label>
+                    <input
+                        type="text"
+                        id="apiUrl"
+                        value="https://seu-dominio.com"
+                        placeholder="https://seu-dominio.com"
+                    >
+                </div>
+
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📹</div>
+                    <p class="upload-text">Clique ou arraste um vídeo aqui</p>
+                </div>
+
+                <input type="file" id="videoInput" accept="video/*">
+
+                <div id="videoPreview" class="video-preview" style="display: none;">
+                    <video id="originalVideo" controls></video>
+                    <div class="video-info">
+                        <div><strong>Nome:</strong> <span id="videoName"></span></div>
+                        <div><strong>Tamanho:</strong> <span id="videoSize"></span></div>
+                        <div><strong>Duração:</strong> <span id="videoDuration"></span></div>
+                    </div>
+                </div>
+
+                <div id="statusMessage" class="status-message"></div>
+            </div>
+
+            <!-- Right Column: Configuração -->
+            <div class="section">
+                <h2>⚙️ Configuração</h2>
+
+                <div class="tabs">
+                    <button class="tab active" data-endpoint="lightweight">
+                        ⭐ Lightweight
+                    </button>
+                    <button class="tab" data-endpoint="simple">
+                        Simple
+                    </button>
+                    <button class="tab" data-endpoint="optimized">
+                        Optimized
+                    </button>
+                    <button class="tab" data-endpoint="border">
+                        Border
+                    </button>
+                </div>
+
+                <!-- Lightweight Config -->
+                <div class="endpoint-config active" data-config="lightweight">
+                    <div class="info-box">
+                        <strong>Lightweight:</strong> Mudanças mínimas (5-10%) com máxima qualidade
+                    </div>
+
+                    <div class="param-group">
+                        <label>Border Size (px)</label>
+                        <input type="range" id="borderSize-lightweight" min="10" max="50" value="20" step="5">
+                        <span id="borderSizeValue-lightweight">20</span>px
+                    </div>
+
+                    <div class="param-group">
+                        <label>Border Color</label>
+                        <input type="color" id="borderColor-lightweight" value="#000000">
+                    </div>
+
+                    <div class="param-group">
+                        <label>Compression Quality</label>
+                        <input type="range" id="compression-lightweight" min="18" max="32" value="23" step="1">
+                        <span id="compressionValue-lightweight">23</span>
+                        <div class="param-hint">18 = Máxima qualidade, 32 = Mais comprimido</div>
+                    </div>
+
+                    <div class="param-group">
+                        <label>Contrast Boost</label>
+                        <input type="number" id="contrastBoost-lightweight" min="1.0" max="1.1" value="1.02" step="0.01">
+                        <div class="param-hint">1.0 = Sem mudança, 1.1 = +10%</div>
+                    </div>
+                </div>
+
+                <!-- Simple Config -->
+                <div class="endpoint-config" data-config="simple">
+                    <div class="info-box">
+                        <strong>Simple:</strong> Borda simples sem efeitos adicionais
+                    </div>
+
+                    <div class="param-group">
+                        <label>Border Size (px)</label>
+                        <input type="range" id="borderSize-simple" min="20" max="80" value="40" step="5">
+                        <span id="borderSizeValue-simple">40</span>px
+                    </div>
+
+                    <div class="param-group">
+                        <label>Border Color</label>
+                        <input type="color" id="borderColor-simple" value="#1a1a1a">
+                    </div>
+
+                    <div class="param-group">
+                        <label>Compression</label>
+                        <input type="range" id="compression-simple" min="18" max="32" value="28" step="1">
+                        <span id="compressionValue-simple">28</span>
+                    </div>
+                </div>
+
+                <!-- Optimized Config -->
+                <div class="endpoint-config" data-config="optimized">
+                    <div class="info-box">
+                        <strong>Optimized:</strong> Máxima proteção com borda + filtros + vinheta
+                    </div>
+
+                    <div class="param-group">
+                        <label>Border Size (px)</label>
+                        <input type="range" id="borderSize-optimized" min="20" max="80" value="40" step="5">
+                        <span id="borderSizeValue-optimized">40</span>px
+                    </div>
+
+                    <div class="param-group">
+                        <label>Border Color</label>
+                        <input type="color" id="borderColor-optimized" value="#1a1a1a">
+                    </div>
+
+                    <div class="param-group">
+                        <label>Filter Type</label>
+                        <select id="filterType-optimized">
+                            <option value="warm">Warm (Quente)</option>
+                            <option value="cool">Cool (Frio)</option>
+                            <option value="saturated">Saturated (Vibrante)</option>
+                            <option value="desaturated">Desaturated (Neutro)</option>
+                            <option value="vintage">Vintage (Retrô)</option>
+                        </select>
+                    </div>
+
+                    <div class="param-group">
+                        <label>Vignette Intensity</label>
+                        <input type="range" id="vignetteIntensity-optimized" min="0" max="0.5" value="0" step="0.05">
+                        <span id="vignetteValue-optimized">0.0</span>
+                        <div class="param-hint">0.0 = Sem efeito, 0.5 = Muito forte</div>
+                    </div>
+
+                    <div class="param-group">
+                        <label>Compression</label>
+                        <input type="range" id="compression-optimized" min="18" max="32" value="28" step="1">
+                        <span id="compressionValue-optimized">28</span>
+                    </div>
+                </div>
+
+                <!-- Border Config -->
+                <div class="endpoint-config" data-config="border">
+                    <div class="info-box">
+                        <strong>Border:</strong> Adiciona apenas uma borda simples
+                    </div>
+
+                    <div class="param-group">
+                        <label>Border Size (px)</label>
+                        <input type="range" id="borderSize-border" min="10" max="100" value="50" step="5">
+                        <span id="borderSizeValue-border">50</span>px
+                    </div>
+
+                    <div class="param-group">
+                        <label>Border Color</label>
+                        <input type="color" id="borderColor-border" value="#000000">
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-primary" id="processBtn" disabled>
+                        🚀 Processar Vídeo
+                    </button>
+                    <button class="btn-secondary" id="clearBtn">Limpar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Section -->
+        <div style="padding: 0 40px 40px;">
+            <h2 style="font-size: 1.3em; margin-bottom: 20px; color: var(--dark);">📊 Comparação</h2>
+            <div class="comparison" id="comparison" style="display: none;">
+                <div class="video-container">
+                    <h3>📹 Vídeo Original</h3>
+                    <video id="originalVideoComp" controls></video>
+                    <button class="download-btn" id="downloadOriginal" disabled>⬇️ Download</button>
+                </div>
+                <div class="video-container">
+                    <h3>✨ Vídeo Processado</h3>
+                    <video id="processedVideo" controls></video>
+                    <button class="download-btn" id="downloadProcessed" disabled>⬇️ Download</button>
+                </div>
+            </div>
+
+            <div class="stats" id="stats" style="display: none;">
+                <div class="stat">
+                    <strong>Original</strong>
+                    <span id="statOriginal">-</span>
+                </div>
+                <div class="stat">
+                    <strong>Processado</strong>
+                    <span id="statProcessed">-</span>
+                </div>
+                <div class="stat">
+                    <strong>Redução</strong>
+                    <span id="statReduction">-</span>
+                </div>
+                <div class="stat">
+                    <strong>Endpoint</strong>
+                    <span id="statEndpoint">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>🎬 Video API Tester • Teste e compare diferentes estratégias de edição de vídeo</p>
+            <p style="margin-top: 10px; opacity: 0.7;">Certifique-se de que a API está rodando e a URL está correta</p>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let processedFileUrl = null;
+        let currentEndpoint = 'lightweight';
+
+        // DOM Elements
+        const uploadArea = document.getElementById('uploadArea');
+        const videoInput = document.getElementById('videoInput');
+        const videoPreview = document.getElementById('videoPreview');
+        const originalVideo = document.getElementById('originalVideo');
+        const processBtn = document.getElementById('processBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const statusMessage = document.getElementById('statusMessage');
+        const apiUrlInput = document.getElementById('apiUrl');
+        const tabs = document.querySelectorAll('.tab');
+        const configs = document.querySelectorAll('.endpoint-config');
+
+        // Upload Area
+        uploadArea.addEventListener('click', () => videoInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+
+        videoInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        function handleFileSelect(file) {
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                originalVideo.src = e.target.result;
+                document.getElementById('originalVideoComp').src = e.target.result;
+                videoPreview.style.display = 'block';
+                document.getElementById('videoName').textContent = file.name;
+                document.getElementById('videoSize').textContent = formatBytes(file.size);
+                processBtn.disabled = false;
+
+                originalVideo.addEventListener('loadedmetadata', () => {
+                    document.getElementById('videoDuration').textContent = formatTime(originalVideo.duration);
+                    document.getElementById('statOriginal').textContent = formatBytes(file.size);
+                });
+            };
+            reader.readAsDataURL(file);
+            showStatus('Vídeo carregado com sucesso!', 'success');
+        }
+
+        // Tabs
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                configs.forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                currentEndpoint = tab.dataset.endpoint;
+                document.querySelector(`.endpoint-config[data-config="${currentEndpoint}"]`).classList.add('active');
+            });
+        });
+
+        // Range Sliders
+        document.querySelectorAll('input[type="range"]').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const valueSpan = document.getElementById(e.target.id + 'Value');
+                if (valueSpan) {
+                    valueSpan.textContent = e.target.value;
+                }
+            });
+        });
+
+        // Process Button
+        processBtn.addEventListener('click', processVideo);
+        clearBtn.addEventListener('click', clearAll);
+
+        async function processVideo() {
+            if (!selectedFile) {
+                showStatus('Selecione um vídeo primeiro!', 'error');
+                return;
+            }
+
+            processBtn.disabled = true;
+            processBtn.innerHTML = '<span class="loading"></span> Processando...';
+            statusMessage.innerHTML = '';
+
+            const formData = new FormData();
+            formData.append('video', selectedFile);
+
+            const params = getEndpointParams();
+            Object.entries(params).forEach(([key, value]) => {
+                formData.append(key, value);
+            });
+
+            const apiUrl = apiUrlInput.value.replace(/\/$/, '');
+            const endpoint = `/api/instagram/${currentEndpoint}`;
+            const fullUrl = `${apiUrl}${endpoint}`;
+
+            document.getElementById('statEndpoint').textContent = currentEndpoint;
+
+            try {
+                showStatus('Enviando vídeo para processamento...', 'info');
+                const response = await fetch(fullUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    processedFileUrl = `${apiUrl}/download/${data.file}`;
+                    document.getElementById('processedVideo').src = processedFileUrl;
+                    document.getElementById('downloadProcessed').disabled = false;
+                    document.getElementById('comparison').style.display = 'grid';
+                    document.getElementById('stats').style.display = 'grid';
+
+                    showStatus(`✅ Vídeo processado com sucesso! Arquivo: ${data.file}`, 'success');
+                    document.getElementById('statProcessed').textContent = '...';
+                } else {
+                    showStatus(`❌ Erro: ${data.error || 'Erro desconhecido'}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Erro de conexão: ${error.message}\n\nCertifique-se que:\n1. A API está rodando\n2. A URL está correta\n3. Não há CORS issues`, 'error');
+                console.error(error);
+            } finally {
+                processBtn.disabled = false;
+                processBtn.innerHTML = '🚀 Processar Vídeo';
+            }
+        }
+
+        function getEndpointParams() {
+            const params = {};
+
+            if (currentEndpoint === 'lightweight') {
+                params.borderSize = document.getElementById('borderSize-lightweight').value;
+                params.borderColor = document.getElementById('borderColor-lightweight').value.replace('#', '');
+                params.compression = document.getElementById('compression-lightweight').value;
+                params.contrastBoost = document.getElementById('contrastBoost-lightweight').value;
+                params.saturation = '1.0';
+            } else if (currentEndpoint === 'simple') {
+                params.borderSize = document.getElementById('borderSize-simple').value;
+                params.borderColor = document.getElementById('borderColor-simple').value.replace('#', '');
+                params.compression = document.getElementById('compression-simple').value;
+            } else if (currentEndpoint === 'optimized') {
+                params.borderSize = document.getElementById('borderSize-optimized').value;
+                params.borderColor = document.getElementById('borderColor-optimized').value.replace('#', '');
+                params.filterType = document.getElementById('filterType-optimized').value;
+                params.vignetteIntensity = document.getElementById('vignetteIntensity-optimized').value;
+                params.compression = document.getElementById('compression-optimized').value;
+            } else if (currentEndpoint === 'border') {
+                params.borderSize = document.getElementById('borderSize-border').value;
+                params.borderColor = document.getElementById('borderColor-border').value.replace('#', '');
+            }
+
+            return params;
+        }
+
+        function clearAll() {
+            selectedFile = null;
+            videoInput.value = '';
+            videoPreview.style.display = 'none';
+            document.getElementById('comparison').style.display = 'none';
+            document.getElementById('stats').style.display = 'none';
+            processBtn.disabled = true;
+            processedFileUrl = null;
+            statusMessage.innerHTML = '';
+        }
+
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message show ${type}`;
+            if (type === 'success') {
+                setTimeout(() => statusMessage.classList.remove('show'), 5000);
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function formatTime(seconds) {
+            if (!seconds) return '0:00';
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Download Buttons
+        document.getElementById('downloadOriginal').addEventListener('click', () => {
+            if (selectedFile) {
+                const url = URL.createObjectURL(selectedFile);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = selectedFile.name;
+                a.click();
+            }
+        });
+
+        document.getElementById('downloadProcessed').addEventListener('click', () => {
+            if (processedFileUrl) {
+                const a = document.createElement('a');
+                a.href = processedFileUrl;
+                a.download = 'video-processado.mp4';
+                a.click();
+            }
+        });
+    </script>
+</body>
+</html>

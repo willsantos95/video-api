@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -63,6 +64,8 @@ app.post('/api/instagram/vignette', upload.single('video'), instagramController.
 app.post('/api/instagram/zoom', upload.single('video'), instagramController.addZoomEffect);
 app.post('/api/instagram/filter', upload.single('video'), instagramController.addColorFilter);
 app.post('/api/instagram/optimized', upload.single('video'), instagramController.instagramOptimized);
+app.post('/api/instagram/simple', upload.single('video'), instagramController.simpleAntiDetection);
+app.post('/api/instagram/lightweight', upload.single('video'), instagramController.lightweightAntiDetection);
 
 // Servir arquivos processados
 app.get('/download/:filename', (req, res) => {
