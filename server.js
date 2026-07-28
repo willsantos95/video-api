@@ -28,6 +28,7 @@ const upload = multer({ storage });
 const videoController = require('./controllers/videoController');
 const audioController = require('./controllers/audioController');
 const subtitleController = require('./controllers/subtitleController');
+const instagramController = require('./controllers/instagramController');
 
 app.get('/health', (req, res) => {
   res.json({ status: 'API rodando', timestamp: new Date() });
@@ -52,6 +53,16 @@ app.post('/api/audio/convert', upload.single('audio'), audioController.convertAu
 app.post('/api/subtitle/generate', upload.single('video'), subtitleController.generateSubtitle);
 app.post('/api/subtitle/add', upload.fields([{ name: 'video' }, { name: 'subtitle' }]), subtitleController.addSubtitle);
 app.post('/api/subtitle/convert', upload.single('subtitle'), subtitleController.convertSubtitleFormat);
+
+// Rotas de Instagram (Anti-Detection)
+app.post('/api/instagram/border', upload.single('video'), instagramController.addBorder);
+app.post('/api/instagram/gradient-border', upload.single('video'), instagramController.addGradientBorder);
+app.post('/api/instagram/pattern-border', upload.single('video'), instagramController.addPatternBorder);
+app.post('/api/instagram/blur-sides', upload.single('video'), instagramController.addBlurSides);
+app.post('/api/instagram/vignette', upload.single('video'), instagramController.addVignette);
+app.post('/api/instagram/zoom', upload.single('video'), instagramController.addZoomEffect);
+app.post('/api/instagram/filter', upload.single('video'), instagramController.addColorFilter);
+app.post('/api/instagram/optimized', upload.single('video'), instagramController.instagramOptimized);
 
 // Servir arquivos processados
 app.get('/download/:filename', (req, res) => {
