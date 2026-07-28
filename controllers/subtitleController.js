@@ -1,14 +1,15 @@
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
-const { promisify } = require('util');
+const { OpenAI } = require('openai');
 
-const execPromise = promisify(exec);
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
-const getOutputPath = (inputPath, suffix, format = 'vtt') => {
+const getOutputPath = (inputPath, suffix, format = 'srt') => {
   const dir = path.dirname(inputPath);
-  const basename = path.basename(inputPath, path.extExtname(inputPath));
+  const basename = path.basename(inputPath, path.extname(inputPath));
   return path.join(dir, `${basename}_${suffix}.${format}`);
 };
 
@@ -17,42 +18,84 @@ const generateSubtitle = async (req, res) => {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
 
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(400).json({ error: 'OPENAI_API_KEY não configurada' });
+  }
+
   try {
     const inputPath = req.file.path;
     const language = req.body.language || 'pt';
-    const outputPath = path.join(path.dirname(inputPath), `${path.basename(inputPath, path.extname(inputPath))}_subtitle.srt`);
+    const outputPath = getOutputPath(inputPath, 'subtitle');
+    const audioPath = path.join(path.dirname(inputPath), `audio_${Date.now()}.mp3`);
 
-    // Usar ffmpeg para extrair áudio e depois usar um serviço de speech-to-text
-    // Nota: Você precisará configurar uma API de STT (Google Cloud, Azure, etc)
-    // Por enquanto, criamos um arquivo de exemplo
+    // 1. Extrair áudio do vídeo
+    await new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .output(audioPath)
+        .audioCodec('libmp3lame')
+        .audioChannels(1)
+        .audioFrequency(16000)
+        .on('end', resolve)
+        .on('error', reject)
+        .run();
+    });
 
-    const srtContent = `1
-00:00:00,000 --> 00:00:05,000
-Legenda de exemplo 1
+    // 2. Transcrever com OpenAI Whisper
+    const transcript = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(audioPath),
+      model: 'whisper-1',
+      language: language === 'pt' ? 'pt' : language
+    });
 
-2
-00:00:05,000 --> 00:00:10,000
-Legenda de exemplo 2
-
-3
-00:00:10,000 --> 00:00:15,000
-Legenda de exemplo 3
-`;
-
+    // 3. Gerar arquivo SRT com timestamps
+    const srtContent = generateSRTFromTranscription(transcript.text);
     fs.writeFileSync(outputPath, srtContent);
+
+    // Limpar arquivo de áudio temporário
+    fs.unlinkSync(audioPath);
 
     res.json({
       success: true,
-      message: 'Arquivo de legenda criado (exemplo). Configure uma API de STT para usar automaticamente',
+      message: 'Legendas geradas com OpenAI Whisper',
       file: path.basename(outputPath),
       format: 'srt',
       language: language,
-      note: 'Para legendas automáticas, configure Google Cloud Speech-to-Text ou similiar',
+      transcription: transcript.text,
       url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+};
+
+const generateSRTFromTranscription = (text) => {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  let srt = '';
+  let timeInSeconds = 0;
+  const avgWordsPerSecond = 3;
+
+  sentences.forEach((sentence, index) => {
+    const trimmedSentence = sentence.trim();
+    const wordCount = trimmedSentence.split(/\s+/).length;
+    const duration = Math.max((wordCount / avgWordsPerSecond), 2);
+
+    const startTime = formatSRTTime(timeInSeconds);
+    const endTime = formatSRTTime(timeInSeconds + duration);
+
+    srt += `${index + 1}\n${startTime} --> ${endTime}\n${trimmedSentence}\n\n`;
+    timeInSeconds += duration;
+  });
+
+  return srt;
+};
+
+const formatSRTTime = (seconds) => {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 1000);
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
 };
 
 const addSubtitle = (req, res) => {
