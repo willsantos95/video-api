@@ -656,6 +656,56 @@
                         <div class="status" id="status_thm"></div>
                         <div class="response-box" id="response_thm"></div>
                     </div>
+
+                    <div class="endpoint-group">
+                        <h3>❌ Remove Logo <span class="badge">POST</span></h3>
+                        <p class="endpoint-desc">Remover ou cobrir logo do vídeo • 3 métodos disponíveis</p>
+                        <div class="params-grid">
+                            <div class="param-group file-input">
+                                <label>Vídeo</label>
+                                <input type="file" id="video_rmlogo" accept="video/*" onchange="updateFileName(this, 'name_rmlogo')">
+                                <span style="font-size:0.8em;color:#999;" id="name_rmlogo"></span>
+                            </div>
+                            <div class="param-group">
+                                <label>Método</label>
+                                <select id="method_rmlogo">
+                                    <option value="blur">Blur/Delogo (Borrar)</option>
+                                    <option value="crop">Crop (Cortar)</option>
+                                    <option value="pixelize">Pixelize (Pixelizar)</option>
+                                </select>
+                            </div>
+                            <div class="param-group">
+                                <label>Logo X (px)</label>
+                                <input type="number" id="logox_rmlogo" value="10" min="0">
+                            </div>
+                            <div class="param-group">
+                                <label>Logo Y (px)</label>
+                                <input type="number" id="logoy_rmlogo" value="10" min="0">
+                            </div>
+                            <div class="param-group">
+                                <label>Logo Width (px)</label>
+                                <input type="number" id="logow_rmlogo" value="200" min="10">
+                            </div>
+                            <div class="param-group">
+                                <label>Logo Height (px)</label>
+                                <input type="number" id="logoh_rmlogo" value="100" min="10">
+                            </div>
+                            <div class="param-group">
+                                <label>Crop Top (px)</label>
+                                <input type="number" id="cropt_rmlogo" value="0" min="0">
+                            </div>
+                            <div class="param-group">
+                                <label>Crop Bottom (px)</label>
+                                <input type="number" id="cropb_rmlogo" value="0" min="0">
+                            </div>
+                        </div>
+                        <div class="buttons-row">
+                            <button class="process" onclick="send('/api/video/remove-logo', 'rmlogo')">Remover Logo</button>
+                            <button class="clear" onclick="clear_ep('rmlogo')">Limpar</button>
+                        </div>
+                        <div class="status" id="status_rmlogo"></div>
+                        <div class="response-box" id="response_rmlogo"></div>
+                    </div>
                 </div>
 
                 <!-- Audio Tab -->
@@ -882,7 +932,7 @@
                 'lw': 'video_lw', 'sm': 'video_sm', 'opt': 'video_opt', 'bd': 'video_bd',
                 'cmp': 'video_cmp', 'cvt': 'video_cvt', 'trm': 'video_trm', 'rsz': 'video_rsz',
                 'wtr': 'video_wtr', 'thm': 'video_thm', 'extr': 'video_extr', 'tts': null,
-                'acvt': 'audio_cvt', 'gsub': 'video_gsub', 'asub': 'video_asub', 'csub': 'sub_csub'
+                'acvt': 'audio_cvt', 'gsub': 'video_gsub', 'asub': 'video_asub', 'csub': 'sub_csub', 'rmlogo': 'video_rmlogo'
             };
 
             if (fileInputs[id] && document.getElementById(fileInputs[id])) {
@@ -912,7 +962,8 @@
                 'extr': { format: 'fmt_extr' },
                 'tts': { text: 'txt_tts', language: 'lang_tts' },
                 'acvt': { format: 'fmt_acvt' },
-                'csub': { format: 'fmt_csub' }
+                'csub': { format: 'fmt_csub' },
+                'rmlogo': { method: 'method_rmlogo', logoX: 'logox_rmlogo', logoY: 'logoy_rmlogo', logoWidth: 'logow_rmlogo', logoHeight: 'logoh_rmlogo', cropTop: 'cropt_rmlogo', cropBottom: 'cropb_rmlogo' }
             };
 
             if (paramMap[id]) {

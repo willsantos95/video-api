@@ -224,6 +224,62 @@ const mergeVideos = (req, res) => {
     .run();
 };
 
+const removeLogo = (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+  }
+
+  const {
+    method = 'blur',
+    logoX = '10',
+    logoY = '10',
+    logoWidth = '200',
+    logoHeight = '100',
+    cropTop = '0',
+    cropBottom = '0'
+  } = req.body;
+
+  const inputPath = req.file.path;
+  const outputPath = getOutputPath(inputPath, `no-logo-${method}`);
+
+  let videoFilter = '';
+
+  if (method === 'blur') {
+    videoFilter = `delogo=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}`;
+  } else if (method === 'crop') {
+    const cropStr = `crop=iw:ih-${parseInt(cropTop)}-${parseInt(cropBottom)}:0:${cropTop}`;
+    videoFilter = cropStr;
+  } else if (method === 'pixelize') {
+    videoFilter = `boxblur=10:2:enable='between(t,0,100)'[bg];[0][bg]overlay=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}`;
+  }
+
+  ffmpeg(inputPath)
+    .output(outputPath)
+    .videoFilters(videoFilter)
+    .outputOptions(['-c:a copy'])
+    .on('end', () => {
+      res.json({
+        success: true,
+        message: `Logo removido com método: ${method}`,
+        file: path.basename(outputPath),
+        method: method,
+        parameters: {
+          logoX,
+          logoY,
+          logoWidth,
+          logoHeight,
+          cropTop,
+          cropBottom
+        },
+        url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
+      });
+    })
+    .on('error', (err) => {
+      res.status(500).json({ error: err.message });
+    })
+    .run();
+};
+
 module.exports = {
   compressVideo,
   convertFormat,
@@ -231,5 +287,6 @@ module.exports = {
   resizeVideo,
   addWatermark,
   extractThumbnail,
-  mergeVideos
+  mergeVideos,
+  removeLogo
 };

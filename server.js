@@ -43,6 +43,7 @@ app.post('/api/video/resize', upload.single('video'), videoController.resizeVide
 app.post('/api/video/watermark', upload.single('video'), videoController.addWatermark);
 app.post('/api/video/thumbnail', upload.single('video'), videoController.extractThumbnail);
 app.post('/api/video/merge', upload.array('videos', 10), videoController.mergeVideos);
+app.post('/api/video/remove-logo', upload.single('video'), videoController.removeLogo);
 
 // Rotas de áudio
 app.post('/api/audio/extract', upload.single('video'), audioController.extractAudio);
