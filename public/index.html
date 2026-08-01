@@ -768,6 +768,29 @@
                     </div>
 
                     <div class="endpoint-group">
+                        <h3>🔍 Detect Logo Position <span class="badge">POST</span></h3>
+                        <p class="endpoint-desc">Detecta automaticamente a posição da logo antiga • Requer Python + OpenCV</p>
+                        <div class="params-grid">
+                            <div class="param-group file-input">
+                                <label>Vídeo</label>
+                                <input type="file" id="video_detect" accept="video/*" onchange="updateFileName(this, 'name_detect')">
+                                <span style="font-size:0.8em;color:#999;" id="name_detect"></span>
+                            </div>
+                            <div class="param-group file-input">
+                                <label>Logo Atual (PNG/JPG)</label>
+                                <input type="file" id="logo_detect" accept="image/png,image/jpeg" onchange="updateFileName(this, 'name_detect_logo')">
+                                <span style="font-size:0.8em;color:#999;" id="name_detect_logo"></span>
+                            </div>
+                        </div>
+                        <div class="buttons-row">
+                            <button class="process" onclick="detectAndFill()">Detectar Logo</button>
+                            <button class="clear" onclick="clear_ep('detect')">Limpar</button>
+                        </div>
+                        <div class="status" id="status_detect"></div>
+                        <div class="response-box" id="response_detect"></div>
+                    </div>
+
+                    <div class="endpoint-group">
                         <h3>🔄 Replace Logo <span class="badge">POST</span></h3>
                         <p class="endpoint-desc">Remove logo antigo + adicionar novo logo em uma única operação</p>
                         <div class="params-grid">
@@ -808,6 +831,10 @@
                             <div class="param-group">
                                 <label>Logo Novo - Tamanho (%)</label>
                                 <input type="number" id="scale_replace" value="0.2" min="0.05" max="1.0" step="0.05">
+                            </div>
+                            <div class="param-group">
+                                <label>Qualidade (CRF)</label>
+                                <input type="number" id="quality_replace" value="28" min="18" max="35" title="18=melhor, 35=pior (mais rápido)">
                             </div>
                         </div>
                         <div class="buttons-row">
@@ -1082,7 +1109,7 @@
                 'csub': { format: 'fmt_csub' },
                 'rmlogo': { method: 'method_rmlogo', logoX: 'logox_rmlogo', logoY: 'logoy_rmlogo', logoWidth: 'logow_rmlogo', logoHeight: 'logoh_rmlogo', cropTop: 'cropt_rmlogo', cropBottom: 'cropb_rmlogo' },
                 'addlogo': { position: 'pos_addlogo', scale: 'scale_addlogo', opacity: 'opacity_addlogo', margin: 'margin_addlogo', x: 'x_addlogo', y: 'y_addlogo' },
-                'replace': { logoX: 'oldlogox_replace', logoY: 'oldlogoy_replace', logoWidth: 'oldlogow_replace', logoHeight: 'oldlogoh_replace', newLogoX: 'newlogox_replace', newLogoY: 'newlogoy_replace', logoScale: 'scale_replace' }
+                'replace': { logoX: 'oldlogox_replace', logoY: 'oldlogoy_replace', logoWidth: 'oldlogow_replace', logoHeight: 'oldlogoh_replace', newLogoX: 'newlogox_replace', newLogoY: 'newlogoy_replace', logoScale: 'scale_replace', quality: 'quality_replace' }
             };
 
             if (paramMap[id]) {
@@ -1141,6 +1168,53 @@
                 xGroup.style.display = 'none';
                 yGroup.style.display = 'none';
             }
+        }
+
+        function detectAndFill() {
+            const videoEl = document.getElementById('video_detect');
+            const logoEl = document.getElementById('logo_detect');
+
+            if (!videoEl.files[0]) {
+                showStatus('detect', 'Selecione um vídeo', 'error');
+                return;
+            }
+            if (!logoEl.files[0]) {
+                showStatus('detect', 'Selecione a imagem da logo', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('video', videoEl.files[0]);
+            formData.append('logo', logoEl.files[0]);
+
+            showStatus('detect', 'Detectando logo...', 'loading');
+
+            fetch(`${apiUrl}/api/video/detect-logo`, { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    const respEl = document.getElementById('response_detect');
+                    respEl.textContent = JSON.stringify(data, null, 2);
+                    respEl.style.display = 'block';
+
+                    if (data.success && data.coordinates) {
+                        // Preencher campos do Replace Logo
+                        document.getElementById('oldlogox_replace').value = data.coordinates.x;
+                        document.getElementById('oldlogoy_replace').value = data.coordinates.y;
+                        document.getElementById('oldlogow_replace').value = data.coordinates.width;
+                        document.getElementById('oldlogoh_replace').value = data.coordinates.height;
+
+                        showStatus('detect', `✓ Logo detectada em (${data.coordinates.x}, ${data.coordinates.y}) • Confiança: ${(data.coordinates.confidence * 100).toFixed(1)}%`, 'success');
+                    } else if (data.success === false) {
+                        showStatus('detect', '⚠ ' + data.message, 'info');
+                    } else {
+                        showStatus('detect', data.message || 'Sucesso!', 'success');
+                    }
+                })
+                .catch(err => {
+                    showStatus('detect', 'Erro: ' + err.message, 'error');
+                    document.getElementById('response_detect').textContent = 'Erro: ' + err.message;
+                    document.getElementById('response_detect').style.display = 'block';
+                });
         }
     </script>
 </body>

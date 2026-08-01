@@ -398,52 +398,49 @@ const removeAndAddLogo = (req, res) => {
     logoHeight = '100',
     newLogoX = '50',
     newLogoY = '50',
-    logoScale = '0.2'
+    logoScale = '0.2',
+    quality = '28'
   } = req.body;
 
-  const intermediateOutputPath = path.join(path.dirname(videoPath), `no_old_logo_${Date.now()}.mp4`);
   const finalOutputPath = path.join(path.dirname(videoPath), `replaced_logo_${Date.now()}.mp4`);
 
+  const complexFilterStr = `[0]delogo=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}[delogged];[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[delogged][logo]overlay=x=${newLogoX}:y=${newLogoY}[out]`;
+
   ffmpeg(videoPath)
-    .output(intermediateOutputPath)
-    .videoFilters(`delogo=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}`)
-    .outputOptions(['-c:a copy'])
+    .input(logoPath)
+    .output(finalOutputPath)
+    .complexFilter(complexFilterStr, ['out'])
+    .outputOptions([
+      '-c:v libx264',
+      `-crf ${quality}`,
+      '-preset fast',
+      '-c:a aac',
+      '-b:a 128k',
+      '-pix_fmt yuv420p'
+    ])
     .on('end', () => {
-      ffmpeg(intermediateOutputPath)
-        .input(logoPath)
-        .output(finalOutputPath)
-        .complexFilter(`[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[0:v][logo]overlay=x=${newLogoX}:y=${newLogoY}`)
-        .outputOptions(['-c:a aac', '-b:a 128k', '-c:v libx264', '-pix_fmt yuv420p'])
-        .on('end', () => {
-          fs.unlinkSync(intermediateOutputPath);
-          res.json({
-            success: true,
-            message: 'Logo removido e novo logo adicionado com sucesso',
-            file: path.basename(finalOutputPath),
-            oldLogoRemoval: {
-              method: 'blur (delogo)',
-              x: logoX,
-              y: logoY,
-              width: logoWidth,
-              height: logoHeight
-            },
-            newLogoAdded: {
-              x: newLogoX,
-              y: newLogoY,
-              scale: logoScale
-            },
-            executionTime: getExecutionTime(startTime),
-            url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(finalOutputPath)}`
-          });
-        })
-        .on('error', (err) => {
-          fs.unlinkSync(intermediateOutputPath);
-          res.status(500).json({ error: 'Erro ao adicionar novo logo: ' + err.message });
-        })
-        .run();
+      res.json({
+        success: true,
+        message: 'Logo removido e novo logo adicionado com sucesso',
+        file: path.basename(finalOutputPath),
+        oldLogoRemoval: {
+          method: 'blur (delogo)',
+          x: logoX,
+          y: logoY,
+          width: logoWidth,
+          height: logoHeight
+        },
+        newLogoAdded: {
+          x: newLogoX,
+          y: newLogoY,
+          scale: logoScale
+        },
+        executionTime: getExecutionTime(startTime),
+        url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(finalOutputPath)}`
+      });
     })
     .on('error', (err) => {
-      res.status(500).json({ error: 'Erro ao remover logo antigo: ' + err.message });
+      res.status(500).json({ error: err.message });
     })
     .run();
 };
