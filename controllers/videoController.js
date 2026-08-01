@@ -399,12 +399,29 @@ const removeAndAddLogo = (req, res) => {
     newLogoX = '50',
     newLogoY = '50',
     logoScale = '0.2',
-    quality = '28'
+    quality = '28',
+    centerLogo = 'true'
   } = req.body;
 
   const finalOutputPath = path.join(path.dirname(videoPath), `replaced_logo_${Date.now()}.mp4`);
 
-  const complexFilterStr = `[0]delogo=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}[delogged];[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[delogged][logo]overlay=x=${newLogoX}:y=${newLogoY}[out]`;
+  // Calculate logo center position if centerLogo is enabled
+  const oldLogoCenterX = parseInt(logoX) + parseInt(logoWidth) / 2;
+  const oldLogoCenterY = parseInt(logoY) + parseInt(logoHeight) / 2;
+
+  // Position for centered overlay: center - (scaled_width/2) and center - (scaled_height/2)
+  const shouldCenter = centerLogo === 'true' || centerLogo === true;
+  let overlayX, overlayY;
+
+  if (shouldCenter) {
+    overlayX = `${oldLogoCenterX}-iw*${logoScale}/2`;
+    overlayY = `${oldLogoCenterY}-ih*${logoScale}/2`;
+  } else {
+    overlayX = newLogoX;
+    overlayY = newLogoY;
+  }
+
+  const complexFilterStr = `[0]delogo=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}[delogged];[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[delogged][logo]overlay=x=${overlayX}:y=${overlayY}[out]`;
 
   ffmpeg(videoPath)
     .input(logoPath)
@@ -428,12 +445,21 @@ const removeAndAddLogo = (req, res) => {
           x: logoX,
           y: logoY,
           width: logoWidth,
-          height: logoHeight
+          height: logoHeight,
+          centerPoint: {
+            x: Math.round(oldLogoCenterX),
+            y: Math.round(oldLogoCenterY)
+          }
         },
         newLogoAdded: {
           x: newLogoX,
           y: newLogoY,
-          scale: logoScale
+          scale: logoScale,
+          centered: shouldCenter,
+          calculatedPosition: shouldCenter ? {
+            x: overlayX,
+            y: overlayY
+          } : null
         },
         executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(finalOutputPath)}`
