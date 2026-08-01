@@ -447,7 +447,9 @@ const removeAndAddLogo = (req, res) => {
       '-preset fast',
       '-c:a aac',
       '-b:a 128k',
-      '-pix_fmt yuv420p'
+      '-pix_fmt yuv420p',
+      '-map', '[out]',
+      '-map', '0:a:0'
     ])
     .on('end', () => {
       res.json({
