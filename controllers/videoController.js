@@ -398,9 +398,10 @@ const removeAndAddLogo = (req, res) => {
     logoHeight = '100',
     newLogoX = '50',
     newLogoY = '50',
-    logoScale = '0.2',
+    logoScale = '0.6',
     quality = '28',
-    centerLogo = 'true'
+    centerLogo = 'true',
+    removalMethod = 'blur'
   } = req.body;
 
   const finalOutputPath = path.join(path.dirname(videoPath), `replaced_logo_${Date.now()}.mp4`);
@@ -410,7 +411,18 @@ const removeAndAddLogo = (req, res) => {
   const overlayX = shouldCenter ? logoX : newLogoX;
   const overlayY = shouldCenter ? logoY : newLogoY;
 
-  const complexFilterStr = `[0]delogo=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}[delogged];[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[delogged][logo]overlay=x=${overlayX}:y=${overlayY}[out]`;
+  // Build removal filter based on method
+  let removalFilterStr;
+  if (removalMethod === 'pixelize') {
+    removalFilterStr = `boxblur=15:4`;
+  } else if (removalMethod === 'crop') {
+    removalFilterStr = `crop=iw:ih-${logoHeight}:0:0`;
+  } else {
+    // default: blur (delogo)
+    removalFilterStr = `delogo=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}`;
+  }
+
+  const complexFilterStr = `[0]${removalFilterStr}[delogged];[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[delogged][logo]overlay=x=${overlayX}:y=${overlayY}[out]`;
 
   ffmpeg(videoPath)
     .input(logoPath)
@@ -430,7 +442,7 @@ const removeAndAddLogo = (req, res) => {
         message: 'Logo removido e novo logo adicionado com sucesso',
         file: path.basename(finalOutputPath),
         oldLogoRemoval: {
-          method: 'blur (delogo)',
+          method: removalMethod,
           x: logoX,
           y: logoY,
           width: logoWidth,
@@ -441,6 +453,12 @@ const removeAndAddLogo = (req, res) => {
           y: overlayY,
           scale: logoScale,
           centered: shouldCenter
+        },
+        recommendations: {
+          note: 'Se o borrão do logo antigo ainda é visível:',
+          option1: 'Aumentar logoScale (ex: 0.7, 0.8, 1.0 para cobrir melhor)',
+          option2: 'Trocar removalMethod para "pixelize" (mais sutil)',
+          option3: 'Usar removalMethod "crop" para remover a área completamente'
         },
         executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(finalOutputPath)}`
