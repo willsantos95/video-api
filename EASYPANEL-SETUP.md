@@ -1,48 +1,43 @@
 # Instalação no EasyPanel
 
-## Opção 1: Instalar com Dockerfile Atualizado (Recomendado)
+## ✅ Setup Padrão (RECOMENDADO)
 
-O novo `Dockerfile` já inclui Python3 + OpenCV automaticamente.
+O novo `Dockerfile` usa **Debian slim** (não Alpine) e inclui **OpenCV pré-instalado**.
+
+### Vantagens:
+- ✅ OpenCV + NumPy inclusos
+- ✅ Detecção de logo **funciona imediatamente**
+- ✅ Build mais rápido que Alpine com compilação
+- ✅ Menor que imagem full Debian
+- ✅ Sem scripts adicionais necessários
 
 ### Passos:
 
 1. **Fazer upload do novo Dockerfile**
-   - Substituir o arquivo `Dockerfile` atual pelo novo (que inclui Python + OpenCV)
+   - Substituir o arquivo `Dockerfile` atual pelo novo
 
-2. **Fazer rebuild da imagem Docker**
-   - No EasyPanel, encontrar o serviço `video-api`
+2. **Fazer rebuild no EasyPanel**
    - Clicar em **Rebuild** ou **Redeploy**
-   - Aguardar build completar (~5-10 minutos)
+   - Aguardar build completar (~3-5 minutos)
 
 3. **Verificar instalação**
-   ```
+   ```bash
    # Abrir terminal do container
-   docker exec -it <container-id> sh
-   python3 -c "import cv2; print(cv2.__version__)"
-   ```
-
-## Opção 2: Instalar Manualmente (Se não quiser rebuild)
-
-Se preferir não fazer rebuild, instale manualmente dentro do container:
-
-1. **Acessar shell do container**
-   ```bash
-   docker exec -it <container-id> sh
-   ```
-
-2. **Instalar Python + OpenCV**
-   ```bash
-   # Instalar pacotes (Alpine Linux)
-   apk add --no-cache python3 py3-pip gcc musl-dev
+   docker exec -it <container-id> bash
    
-   # Instalar OpenCV + NumPy
-   pip3 install opencv-python numpy
+   # Verificar OpenCV
+   python3 -c "import cv2; print('✓ OpenCV:', cv2.__version__)"
    ```
 
-3. **Verificar instalação**
-   ```bash
-   python3 -c "import cv2; print('OpenCV versão:', cv2.__version__)"
-   ```
+4. **Pronto!** ✅
+   - API rodando com todas as funcionalidades
+   - Detecção de logo **ativa**
+   - `/api/video/detect-logo` funciona
+
+## Tamanho da Imagem
+- **Alpine**: ~400MB (com compilação de OpenCV = falha)
+- **Slim com pré-compilado**: ~550MB (funciona)
+- **Full Debian**: ~1.2GB (desnecessário)
 
 ## Opção 3: Via Docker Compose
 
