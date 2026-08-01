@@ -298,7 +298,9 @@ const addLogo = (req, res) => {
     position = 'top-right',
     scale = '0.2',
     opacity = '1.0',
-    margin = '20'
+    margin = '20',
+    x = null,
+    y = null
   } = req.body;
 
   const outputPath = path.join(path.dirname(videoPath), `with_logo_${Date.now()}.mp4`);
@@ -311,22 +313,39 @@ const addLogo = (req, res) => {
     'center': `x=(W-w)/2:y=(H-h)/2`
   };
 
-  const logoFilter = `scale=iw*${scale}:ih*${scale},format=rgba[logo];[0:v][logo]overlay=${positionMap[position]}:alpha=${opacity}`;
+  let overlayPosition;
+  if (x !== null && y !== null) {
+    overlayPosition = `x=${x}:y=${y}`;
+  } else {
+    overlayPosition = positionMap[position];
+  }
+
+  const logoFilter = `scale=iw*${scale}:ih*${scale},format=rgba[logo];[0:v][logo]overlay=${overlayPosition}:alpha=${opacity}`;
 
   ffmpeg(videoPath)
     .output(outputPath)
     .videoFilters(logoFilter)
     .outputOptions(['-c:a copy'])
     .on('end', () => {
-      res.json({
+      const response = {
         success: true,
         message: 'Logo adicionado com sucesso',
         file: path.basename(outputPath),
-        position: position,
         scale: scale,
         opacity: opacity,
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
-      });
+      };
+
+      if (x !== null && y !== null) {
+        response.positioning = 'custom';
+        response.x = x;
+        response.y = y;
+      } else {
+        response.positioning = 'preset';
+        response.position = position;
+      }
+
+      res.json(response);
     })
     .on('error', (err) => {
       res.status(500).json({ error: err.message });

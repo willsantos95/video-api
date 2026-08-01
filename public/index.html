@@ -722,6 +722,13 @@
                                 <span style="font-size:0.8em;color:#999;" id="name_logo"></span>
                             </div>
                             <div class="param-group">
+                                <label>Modo Posição</label>
+                                <select id="posmode_addlogo" onchange="toggleLogoPositionMode()">
+                                    <option value="preset" selected>Pré-definido</option>
+                                    <option value="custom">Customizado (X, Y em pixels)</option>
+                                </select>
+                            </div>
+                            <div class="param-group" id="pos_preset_group">
                                 <label>Posição</label>
                                 <select id="pos_addlogo">
                                     <option value="top-left">Topo-Esquerda</option>
@@ -731,6 +738,18 @@
                                     <option value="center">Centro</option>
                                 </select>
                             </div>
+                            <div class="param-group" id="margin_group">
+                                <label>Margem (px)</label>
+                                <input type="number" id="margin_addlogo" value="20" min="0">
+                            </div>
+                            <div class="param-group" id="x_group" style="display: none;">
+                                <label>Posição X (pixels)</label>
+                                <input type="number" id="x_addlogo" value="20" min="0" placeholder="Ex: 50">
+                            </div>
+                            <div class="param-group" id="y_group" style="display: none;">
+                                <label>Posição Y (pixels)</label>
+                                <input type="number" id="y_addlogo" value="20" min="0" placeholder="Ex: 100">
+                            </div>
                             <div class="param-group">
                                 <label>Tamanho (%)</label>
                                 <input type="number" id="scale_addlogo" value="0.2" min="0.05" max="1.0" step="0.05">
@@ -738,10 +757,6 @@
                             <div class="param-group">
                                 <label>Transparência</label>
                                 <input type="number" id="opacity_addlogo" value="1.0" min="0" max="1.0" step="0.1">
-                            </div>
-                            <div class="param-group">
-                                <label>Margem (px)</label>
-                                <input type="number" id="margin_addlogo" value="20" min="0">
                             </div>
                         </div>
                         <div class="buttons-row">
@@ -1012,14 +1027,28 @@
                 'acvt': { format: 'fmt_acvt' },
                 'csub': { format: 'fmt_csub' },
                 'rmlogo': { method: 'method_rmlogo', logoX: 'logox_rmlogo', logoY: 'logoy_rmlogo', logoWidth: 'logow_rmlogo', logoHeight: 'logoh_rmlogo', cropTop: 'cropt_rmlogo', cropBottom: 'cropb_rmlogo' },
-                'addlogo': { position: 'pos_addlogo', scale: 'scale_addlogo', opacity: 'opacity_addlogo', margin: 'margin_addlogo' }
+                'addlogo': { position: 'pos_addlogo', scale: 'scale_addlogo', opacity: 'opacity_addlogo', margin: 'margin_addlogo', x: 'x_addlogo', y: 'y_addlogo' }
             };
 
             if (paramMap[id]) {
                 Object.entries(paramMap[id]).forEach(([key, fieldId]) => {
                     const el = document.getElementById(fieldId);
-                    if (el) formData.append(key, el.value);
+                    if (el) {
+                        const value = el.value;
+                        if (value || value === '0') formData.append(key, value);
+                    }
                 });
+            }
+
+            if (id === 'addlogo') {
+                const mode = document.getElementById('posmode_addlogo').value;
+                if (mode === 'custom') {
+                    formData.delete('position');
+                    formData.delete('margin');
+                } else {
+                    formData.delete('x');
+                    formData.delete('y');
+                }
             }
 
             showStatus(id, 'Processando...', 'loading');
@@ -1037,6 +1066,26 @@
                     document.getElementById(`response_${id}`).textContent = 'Erro: ' + err.message;
                     document.getElementById(`response_${id}`).style.display = 'block';
                 });
+        }
+
+        function toggleLogoPositionMode() {
+            const mode = document.getElementById('posmode_addlogo').value;
+            const posPresetGroup = document.getElementById('pos_preset_group');
+            const marginGroup = document.getElementById('margin_group');
+            const xGroup = document.getElementById('x_group');
+            const yGroup = document.getElementById('y_group');
+
+            if (mode === 'custom') {
+                posPresetGroup.style.display = 'none';
+                marginGroup.style.display = 'none';
+                xGroup.style.display = 'block';
+                yGroup.style.display = 'block';
+            } else {
+                posPresetGroup.style.display = 'block';
+                marginGroup.style.display = 'block';
+                xGroup.style.display = 'none';
+                yGroup.style.display = 'none';
+            }
         }
     </script>
 </body>
