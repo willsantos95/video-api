@@ -2,30 +2,19 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Instalar dependências de sistema (FFmpeg, Python, OpenCV)
+# Instalar dependências de sistema (FFmpeg, Python)
 RUN apk add --no-cache \
     ffmpeg \
     espeak \
     libsndfile \
     sox \
     python3 \
-    py3-pip \
-    gcc \
-    musl-dev \
-    linux-headers \
-    g++ \
-    make \
-    cmake \
-    jpeg-dev \
-    png-dev \
-    tiff-dev \
-    openexr-dev \
-    libwebp-dev \
-    lapack-dev \
-    openblas-dev
+    py3-pip
 
-# Instalar Python dependencies (OpenCV + NumPy)
-RUN pip3 install --no-cache-dir opencv-python numpy
+# Instalar Python dependencies (OpenCV pré-compilado + NumPy)
+RUN pip3 install --no-cache-dir \
+    opencv-python-headless \
+    numpy
 
 COPY package*.json ./
 
