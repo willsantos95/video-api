@@ -706,6 +706,51 @@
                         <div class="status" id="status_rmlogo"></div>
                         <div class="response-box" id="response_rmlogo"></div>
                     </div>
+
+                    <div class="endpoint-group">
+                        <h3>✏️ Add Logo <span class="badge">POST</span></h3>
+                        <p class="endpoint-desc">Adicionar logo/marca sobre o vídeo • Com posicionamento customizável</p>
+                        <div class="params-grid">
+                            <div class="param-group file-input">
+                                <label>Vídeo</label>
+                                <input type="file" id="video_addlogo" accept="video/*" onchange="updateFileName(this, 'name_addlogo')">
+                                <span style="font-size:0.8em;color:#999;" id="name_addlogo"></span>
+                            </div>
+                            <div class="param-group file-input">
+                                <label>Logo (PNG com transparência)</label>
+                                <input type="file" id="logo_addlogo" accept="image/png,image/jpeg" onchange="updateFileName(this, 'name_logo')">
+                                <span style="font-size:0.8em;color:#999;" id="name_logo"></span>
+                            </div>
+                            <div class="param-group">
+                                <label>Posição</label>
+                                <select id="pos_addlogo">
+                                    <option value="top-left">Topo-Esquerda</option>
+                                    <option value="top-right" selected>Topo-Direita</option>
+                                    <option value="bottom-left">Base-Esquerda</option>
+                                    <option value="bottom-right">Base-Direita</option>
+                                    <option value="center">Centro</option>
+                                </select>
+                            </div>
+                            <div class="param-group">
+                                <label>Tamanho (%)</label>
+                                <input type="number" id="scale_addlogo" value="0.2" min="0.05" max="1.0" step="0.05">
+                            </div>
+                            <div class="param-group">
+                                <label>Transparência</label>
+                                <input type="number" id="opacity_addlogo" value="1.0" min="0" max="1.0" step="0.1">
+                            </div>
+                            <div class="param-group">
+                                <label>Margem (px)</label>
+                                <input type="number" id="margin_addlogo" value="20" min="0">
+                            </div>
+                        </div>
+                        <div class="buttons-row">
+                            <button class="process" onclick="send('/api/video/add-logo', 'addlogo')">Adicionar Logo</button>
+                            <button class="clear" onclick="clear_ep('addlogo')">Limpar</button>
+                        </div>
+                        <div class="status" id="status_addlogo"></div>
+                        <div class="response-box" id="response_addlogo"></div>
+                    </div>
                 </div>
 
                 <!-- Audio Tab -->
@@ -932,7 +977,7 @@
                 'lw': 'video_lw', 'sm': 'video_sm', 'opt': 'video_opt', 'bd': 'video_bd',
                 'cmp': 'video_cmp', 'cvt': 'video_cvt', 'trm': 'video_trm', 'rsz': 'video_rsz',
                 'wtr': 'video_wtr', 'thm': 'video_thm', 'extr': 'video_extr', 'tts': null,
-                'acvt': 'audio_cvt', 'gsub': 'video_gsub', 'asub': 'video_asub', 'csub': 'sub_csub', 'rmlogo': 'video_rmlogo'
+                'acvt': 'audio_cvt', 'gsub': 'video_gsub', 'asub': 'video_asub', 'csub': 'sub_csub', 'rmlogo': 'video_rmlogo', 'addlogo': 'video_addlogo'
             };
 
             if (fileInputs[id] && document.getElementById(fileInputs[id])) {
@@ -946,6 +991,9 @@
             }
             if (id === 'csub' && document.getElementById('sub_csub').files[0]) {
                 formData.append('subtitle', document.getElementById('sub_csub').files[0]);
+            }
+            if (id === 'addlogo' && document.getElementById('logo_addlogo').files[0]) {
+                formData.append('logo', document.getElementById('logo_addlogo').files[0]);
             }
 
             // Add parameters
@@ -963,7 +1011,8 @@
                 'tts': { text: 'txt_tts', language: 'lang_tts' },
                 'acvt': { format: 'fmt_acvt' },
                 'csub': { format: 'fmt_csub' },
-                'rmlogo': { method: 'method_rmlogo', logoX: 'logox_rmlogo', logoY: 'logoy_rmlogo', logoWidth: 'logow_rmlogo', logoHeight: 'logoh_rmlogo', cropTop: 'cropt_rmlogo', cropBottom: 'cropb_rmlogo' }
+                'rmlogo': { method: 'method_rmlogo', logoX: 'logox_rmlogo', logoY: 'logoy_rmlogo', logoWidth: 'logow_rmlogo', logoHeight: 'logoh_rmlogo', cropTop: 'cropt_rmlogo', cropBottom: 'cropb_rmlogo' },
+                'addlogo': { position: 'pos_addlogo', scale: 'scale_addlogo', opacity: 'opacity_addlogo', margin: 'margin_addlogo' }
             };
 
             if (paramMap[id]) {

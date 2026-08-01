@@ -280,6 +280,60 @@ const removeLogo = (req, res) => {
     .run();
 };
 
+const addLogo = (req, res) => {
+  if (!req.files || !req.files.video || !req.files.logo) {
+    return res.status(400).json({ error: 'Vídeo e logo são obrigatórios' });
+  }
+
+  const videoFile = req.files.video[0];
+  const logoFile = req.files.logo[0];
+
+  if (!videoFile || !logoFile) {
+    return res.status(400).json({ error: 'Vídeo e logo são obrigatórios' });
+  }
+
+  const videoPath = videoFile.path;
+  const logoPath = logoFile.path;
+  const {
+    position = 'top-right',
+    scale = '0.2',
+    opacity = '1.0',
+    margin = '20'
+  } = req.body;
+
+  const outputPath = path.join(path.dirname(videoPath), `with_logo_${Date.now()}.mp4`);
+
+  const positionMap = {
+    'top-left': `x=${margin}:y=${margin}`,
+    'top-right': `x=W-w-${margin}:y=${margin}`,
+    'bottom-left': `x=${margin}:y=H-h-${margin}`,
+    'bottom-right': `x=W-w-${margin}:y=H-h-${margin}`,
+    'center': `x=(W-w)/2:y=(H-h)/2`
+  };
+
+  const logoFilter = `scale=iw*${scale}:ih*${scale},format=rgba[logo];[0:v][logo]overlay=${positionMap[position]}:alpha=${opacity}`;
+
+  ffmpeg(videoPath)
+    .output(outputPath)
+    .videoFilters(logoFilter)
+    .outputOptions(['-c:a copy'])
+    .on('end', () => {
+      res.json({
+        success: true,
+        message: 'Logo adicionado com sucesso',
+        file: path.basename(outputPath),
+        position: position,
+        scale: scale,
+        opacity: opacity,
+        url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
+      });
+    })
+    .on('error', (err) => {
+      res.status(500).json({ error: err.message });
+    })
+    .run();
+};
+
 module.exports = {
   compressVideo,
   convertFormat,
@@ -288,5 +342,6 @@ module.exports = {
   addWatermark,
   extractThumbnail,
   mergeVideos,
-  removeLogo
+  removeLogo,
+  addLogo
 };
