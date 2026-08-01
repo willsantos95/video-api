@@ -398,31 +398,44 @@ const removeAndAddLogo = (req, res) => {
     logoHeight = '100',
     newLogoX = '50',
     newLogoY = '50',
-    logoScale = '0.6',
+    logoScale = '0.8',
     quality = '28',
     centerLogo = 'true',
-    removalMethod = 'blur'
+    removalColor = 'white',
+    logoOffsetX = '0',
+    logoOffsetY = '0',
+    positionPreset = null
   } = req.body;
 
   const finalOutputPath = path.join(path.dirname(videoPath), `replaced_logo_${Date.now()}.mp4`);
 
-  // Use old logo position if centerLogo is enabled (simpler and more reliable)
-  const shouldCenter = centerLogo === 'true' || centerLogo === true;
-  const overlayX = shouldCenter ? logoX : newLogoX;
-  const overlayY = shouldCenter ? logoY : newLogoY;
+  // Position presets to keep logo visible
+  const positionPresets = {
+    'top-left': { x: '20', y: '20' },
+    'top-right': { x: 'W-w-20', y: '20' },
+    'bottom-left': { x: '20', y: 'H-h-20' },
+    'bottom-right': { x: 'W-w-20', y: 'H-h-20' },
+    'center': { x: '(W-w)/2', y: '(H-h)/2' }
+  };
 
-  // Build removal filter based on method
-  let removalFilterStr;
-  if (removalMethod === 'pixelize') {
-    removalFilterStr = `boxblur=15:4`;
-  } else if (removalMethod === 'crop') {
-    removalFilterStr = `crop=iw:ih-${logoHeight}:0:0`;
+  // Calculate overlay position
+  const shouldCenter = centerLogo === 'true' || centerLogo === true;
+  let overlayX, overlayY;
+
+  if (positionPreset && positionPresets[positionPreset]) {
+    overlayX = positionPresets[positionPreset].x;
+    overlayY = positionPresets[positionPreset].y;
+  } else if (shouldCenter) {
+    overlayX = parseInt(logoX) + parseInt(logoOffsetX);
+    overlayY = parseInt(logoY) + parseInt(logoOffsetY);
   } else {
-    // default: blur (delogo)
-    removalFilterStr = `delogo=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}`;
+    overlayX = parseInt(newLogoX) + parseInt(logoOffsetX);
+    overlayY = parseInt(newLogoY) + parseInt(logoOffsetY);
   }
 
-  const complexFilterStr = `[0]${removalFilterStr}[delogged];[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[delogged][logo]overlay=x=${overlayX}:y=${overlayY}[out]`;
+  // Build filter chain: drawbox to cover old logo + overlay new logo
+  // drawbox: draw filled rectangle at old logo position with specified color
+  const complexFilterStr = `[0]drawbox=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}:color=${removalColor}:thickness=fill[covered];[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[covered][logo]overlay=x=${overlayX}:y=${overlayY}[out]`;
 
   ffmpeg(videoPath)
     .input(logoPath)
@@ -442,7 +455,8 @@ const removeAndAddLogo = (req, res) => {
         message: 'Logo removido e novo logo adicionado com sucesso',
         file: path.basename(finalOutputPath),
         oldLogoRemoval: {
-          method: removalMethod,
+          method: 'drawbox (cobertura com cor sólida)',
+          color: removalColor,
           x: logoX,
           y: logoY,
           width: logoWidth,
@@ -452,13 +466,15 @@ const removeAndAddLogo = (req, res) => {
           x: overlayX,
           y: overlayY,
           scale: logoScale,
-          centered: shouldCenter
+          centered: shouldCenter,
+          positionMode: positionPreset ? 'preset' : (shouldCenter ? 'old-logo-position' : 'custom'),
+          offset: { x: logoOffsetX, y: logoOffsetY }
         },
-        recommendations: {
-          note: 'Se o borrão do logo antigo ainda é visível:',
-          option1: 'Aumentar logoScale (ex: 0.7, 0.8, 1.0 para cobrir melhor)',
-          option2: 'Trocar removalMethod para "pixelize" (mais sutil)',
-          option3: 'Usar removalMethod "crop" para remover a área completamente'
+        tips: {
+          note: 'Se a cor de cobertura não combinar:',
+          option1: 'Trocar removalColor: "black", "white", "0x00FF00" (verde), etc',
+          option2: 'Aumentar logoScale para cobrir melhor a área',
+          option3: 'Usar positionPreset: "top-right", "bottom-right", "center"'
         },
         executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(finalOutputPath)}`

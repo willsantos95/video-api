@@ -829,16 +829,37 @@
                                 <input type="number" id="newlogoy_replace" value="50" min="0">
                             </div>
                             <div class="param-group">
-                                <label>Método de Remoção</label>
-                                <select id="removalMethod_replace">
-                                    <option value="blur">Blur (padrão) - suave</option>
-                                    <option value="pixelize">Pixelize - sutil</option>
-                                    <option value="crop">Crop - remove área</option>
+                                <label>Cor de Cobertura <span style="color:#ff6b6b;">*cobre logo antigo</span></label>
+                                <select id="removalColor_replace">
+                                    <option value="white">Branco</option>
+                                    <option value="black">Preto</option>
+                                    <option value="0xcccccc">Cinza</option>
+                                    <option value="0xFF6B6B">Vermelho</option>
+                                    <option value="0x4ECDC4">Azul claro</option>
                                 </select>
                             </div>
                             <div class="param-group">
-                                <label>Logo Novo - Tamanho (%) <span style="color:#ff6b6b;">*aumentar ajuda a cobrir</span></label>
-                                <input type="number" id="scale_replace" value="0.6" min="0.05" max="1.0" step="0.05" title="0.6 recomendado, aumentar se borrão ainda visível">
+                                <label>Preset de Posição <span style="color:#999;">*automático</span></label>
+                                <select id="positionPreset_replace">
+                                    <option value="">Nenhum (usar coordenadas)</option>
+                                    <option value="top-left">Top Left</option>
+                                    <option value="top-right">Top Right</option>
+                                    <option value="center">Center</option>
+                                    <option value="bottom-left">Bottom Left</option>
+                                    <option value="bottom-right">Bottom Right</option>
+                                </select>
+                            </div>
+                            <div class="param-group">
+                                <label>Offset X (px) <span style="color:#999;">ajuste fino</span></label>
+                                <input type="number" id="logoOffsetX_replace" value="0" step="10" title="Positivo = direita, Negativo = esquerda">
+                            </div>
+                            <div class="param-group">
+                                <label>Offset Y (px) <span style="color:#999;">ajuste fino</span></label>
+                                <input type="number" id="logoOffsetY_replace" value="0" step="10" title="Positivo = baixo, Negativo = cima">
+                            </div>
+                            <div class="param-group">
+                                <label>Logo Novo - Tamanho (%) <span style="color:#ff6b6b;">*80% padrão</span></label>
+                                <input type="number" id="scale_replace" value="0.8" min="0.1" max="1.5" step="0.05" title="Aumentar para cobrir melhor a área de cobertura">
                             </div>
                             <div class="param-group">
                                 <label>Qualidade (CRF)</label>
@@ -1121,7 +1142,7 @@
                 'csub': { format: 'fmt_csub' },
                 'rmlogo': { method: 'method_rmlogo', logoX: 'logox_rmlogo', logoY: 'logoy_rmlogo', logoWidth: 'logow_rmlogo', logoHeight: 'logoh_rmlogo', cropTop: 'cropt_rmlogo', cropBottom: 'cropb_rmlogo' },
                 'addlogo': { position: 'pos_addlogo', scale: 'scale_addlogo', opacity: 'opacity_addlogo', margin: 'margin_addlogo', x: 'x_addlogo', y: 'y_addlogo' },
-                'replace': { logoX: 'oldlogox_replace', logoY: 'oldlogoy_replace', logoWidth: 'oldlogow_replace', logoHeight: 'oldlogoh_replace', newLogoX: 'newlogox_replace', newLogoY: 'newlogoy_replace', logoScale: 'scale_replace', quality: 'quality_replace', centerLogo: 'centerLogo_replace', removalMethod: 'removalMethod_replace' }
+                'replace': { logoX: 'oldlogox_replace', logoY: 'oldlogoy_replace', logoWidth: 'oldlogow_replace', logoHeight: 'oldlogoh_replace', newLogoX: 'newlogox_replace', newLogoY: 'newlogoy_replace', logoScale: 'scale_replace', quality: 'quality_replace', centerLogo: 'centerLogo_replace', removalColor: 'removalColor_replace', positionPreset: 'positionPreset_replace', logoOffsetX: 'logoOffsetX_replace', logoOffsetY: 'logoOffsetY_replace' }
             };
 
             if (paramMap[id]) {
