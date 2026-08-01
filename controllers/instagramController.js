@@ -15,7 +15,6 @@ const getExecutionTime = (startTime) => {
 // Adicionar borda simples (letterbox)
 const addBorder = (req, res) => {
   const startTime = Date.now();
-  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
