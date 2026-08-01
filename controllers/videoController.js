@@ -405,21 +405,10 @@ const removeAndAddLogo = (req, res) => {
 
   const finalOutputPath = path.join(path.dirname(videoPath), `replaced_logo_${Date.now()}.mp4`);
 
-  // Calculate logo center position if centerLogo is enabled
-  const oldLogoCenterX = parseInt(logoX) + parseInt(logoWidth) / 2;
-  const oldLogoCenterY = parseInt(logoY) + parseInt(logoHeight) / 2;
-
-  // Position for centered overlay: center - (scaled_width/2) and center - (scaled_height/2)
+  // Use old logo position if centerLogo is enabled (simpler and more reliable)
   const shouldCenter = centerLogo === 'true' || centerLogo === true;
-  let overlayX, overlayY;
-
-  if (shouldCenter) {
-    overlayX = `${oldLogoCenterX}-iw*${logoScale}/2`;
-    overlayY = `${oldLogoCenterY}-ih*${logoScale}/2`;
-  } else {
-    overlayX = newLogoX;
-    overlayY = newLogoY;
-  }
+  const overlayX = shouldCenter ? logoX : newLogoX;
+  const overlayY = shouldCenter ? logoY : newLogoY;
 
   const complexFilterStr = `[0]delogo=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}[delogged];[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[delogged][logo]overlay=x=${overlayX}:y=${overlayY}[out]`;
 
@@ -445,21 +434,13 @@ const removeAndAddLogo = (req, res) => {
           x: logoX,
           y: logoY,
           width: logoWidth,
-          height: logoHeight,
-          centerPoint: {
-            x: Math.round(oldLogoCenterX),
-            y: Math.round(oldLogoCenterY)
-          }
+          height: logoHeight
         },
         newLogoAdded: {
-          x: newLogoX,
-          y: newLogoY,
+          x: overlayX,
+          y: overlayY,
           scale: logoScale,
-          centered: shouldCenter,
-          calculatedPosition: shouldCenter ? {
-            x: overlayX,
-            y: overlayY
-          } : null
+          centered: shouldCenter
         },
         executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(finalOutputPath)}`
