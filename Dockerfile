@@ -11,8 +11,9 @@ RUN apk add --no-cache \
     python3 \
     py3-pip
 
-# Instalar Python dependencies (OpenCV pré-compilado + NumPy)
-RUN pip3 install --no-cache-dir \
+# Instalar Python dependencies (OpenCV + NumPy)
+# Usar --break-system-packages para Alpine v3.21+
+RUN pip3 install --no-cache-dir --break-system-packages \
     opencv-python-headless \
     numpy
 
