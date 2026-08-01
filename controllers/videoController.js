@@ -320,12 +320,13 @@ const addLogo = (req, res) => {
     overlayPosition = positionMap[position];
   }
 
-  const logoFilter = `scale=iw*${scale}:ih*${scale},format=rgba[logo];[0:v][logo]overlay=${overlayPosition}:alpha=${opacity}`;
+  const scaleFactor = parseFloat(scale);
 
   ffmpeg(videoPath)
+    .input(logoPath)
     .output(outputPath)
-    .videoFilters(logoFilter)
-    .outputOptions(['-c:a copy'])
+    .complexFilter(`[1:v]scale=iw*${scaleFactor}:ih*${scaleFactor}[logo];[0:v][logo]overlay=${overlayPosition}`)
+    .outputOptions(['-c:a aac', '-b:a 128k', '-c:v libx264', '-pix_fmt yuv420p'])
     .on('end', () => {
       const response = {
         success: true,
