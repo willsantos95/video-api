@@ -13,7 +13,12 @@ const getOutputPath = (inputPath, suffix, format = 'srt') => {
   return path.join(dir, `${basename}_${suffix}.${format}`);
 };
 
+const getExecutionTime = (startTime) => {
+  return parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
+};
+
 const generateSubtitle = async (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -61,6 +66,7 @@ const generateSubtitle = async (req, res) => {
       format: 'srt',
       language: language,
       transcription: transcript.text,
+      executionTime: getExecutionTime(startTime),
       url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
     });
   } catch (err) {
@@ -99,6 +105,7 @@ const formatSRTTime = (seconds) => {
 };
 
 const addSubtitle = (req, res) => {
+  const startTime = Date.now();
   const videoFile = req.files['video']?.[0];
   const subtitleFile = req.files['subtitle']?.[0];
 
@@ -130,6 +137,7 @@ const addSubtitle = (req, res) => {
         file: path.basename(outputPath),
         fontsize: fontsize,
         color: color,
+        executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
     })
@@ -140,6 +148,7 @@ const addSubtitle = (req, res) => {
 };
 
 const convertSubtitleFormat = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -171,6 +180,7 @@ const convertSubtitleFormat = (req, res) => {
     message: `Legenda convertida para ${targetFormat}`,
     file: path.basename(outputPath),
     format: targetFormat,
+    executionTime: getExecutionTime(startTime),
     url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
   });
 };

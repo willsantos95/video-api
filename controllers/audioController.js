@@ -12,7 +12,12 @@ const getOutputPath = (inputPath, suffix, format = 'mp3') => {
   return path.join(dir, `${basename}_${suffix}.${format}`);
 };
 
+const getExecutionTime = (startTime) => {
+  return parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
+};
+
 const extractAudio = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -33,6 +38,7 @@ const extractAudio = (req, res) => {
         file: path.basename(outputPath),
         format: format,
         bitrate: bitrate,
+        executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
     })
@@ -43,6 +49,7 @@ const extractAudio = (req, res) => {
 };
 
 const addAudioToVideo = (req, res) => {
+  const startTime = Date.now();
   const videoFile = req.files['video']?.[0];
   const audioFile = req.files['audio']?.[0];
 
@@ -69,6 +76,7 @@ const addAudioToVideo = (req, res) => {
         success: true,
         message: 'Áudio adicionado ao vídeo com sucesso',
         file: path.basename(outputPath),
+        executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
     })
@@ -79,6 +87,7 @@ const addAudioToVideo = (req, res) => {
 };
 
 const textToAudio = async (req, res) => {
+  const startTime = Date.now();
   const { text, language = 'pt-BR', speed = 1.0 } = req.body;
 
   if (!text) {
@@ -99,6 +108,7 @@ const textToAudio = async (req, res) => {
       file: path.basename(outputPath),
       language: language,
       speed: speed,
+      executionTime: getExecutionTime(startTime),
       url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
     });
   } catch (err) {
@@ -110,6 +120,7 @@ const textToAudio = async (req, res) => {
 };
 
 const convertAudio = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -137,6 +148,7 @@ const convertAudio = (req, res) => {
         file: path.basename(outputPath),
         format: format,
         bitrate: bitrate,
+        executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
     })

@@ -766,6 +766,57 @@
                         <div class="status" id="status_addlogo"></div>
                         <div class="response-box" id="response_addlogo"></div>
                     </div>
+
+                    <div class="endpoint-group">
+                        <h3>🔄 Replace Logo <span class="badge">POST</span></h3>
+                        <p class="endpoint-desc">Remove logo antigo + adicionar novo logo em uma única operação</p>
+                        <div class="params-grid">
+                            <div class="param-group file-input">
+                                <label>Vídeo</label>
+                                <input type="file" id="video_replace" accept="video/*" onchange="updateFileName(this, 'name_replace')">
+                                <span style="font-size:0.8em;color:#999;" id="name_replace"></span>
+                            </div>
+                            <div class="param-group file-input">
+                                <label>Logo Novo (PNG)</label>
+                                <input type="file" id="logo_replace" accept="image/png,image/jpeg" onchange="updateFileName(this, 'name_logo_replace')">
+                                <span style="font-size:0.8em;color:#999;" id="name_logo_replace"></span>
+                            </div>
+                            <div class="param-group">
+                                <label>Logo Antigo - X (px)</label>
+                                <input type="number" id="oldlogox_replace" value="10" min="0">
+                            </div>
+                            <div class="param-group">
+                                <label>Logo Antigo - Y (px)</label>
+                                <input type="number" id="oldlogoy_replace" value="10" min="0">
+                            </div>
+                            <div class="param-group">
+                                <label>Logo Antigo - Largura (px)</label>
+                                <input type="number" id="oldlogow_replace" value="200" min="10">
+                            </div>
+                            <div class="param-group">
+                                <label>Logo Antigo - Altura (px)</label>
+                                <input type="number" id="oldlogoh_replace" value="100" min="10">
+                            </div>
+                            <div class="param-group">
+                                <label>Logo Novo - X (px)</label>
+                                <input type="number" id="newlogox_replace" value="50" min="0">
+                            </div>
+                            <div class="param-group">
+                                <label>Logo Novo - Y (px)</label>
+                                <input type="number" id="newlogoy_replace" value="50" min="0">
+                            </div>
+                            <div class="param-group">
+                                <label>Logo Novo - Tamanho (%)</label>
+                                <input type="number" id="scale_replace" value="0.2" min="0.05" max="1.0" step="0.05">
+                            </div>
+                        </div>
+                        <div class="buttons-row">
+                            <button class="process" onclick="send('/api/video/replace-logo', 'replace')">Substituir Logo</button>
+                            <button class="clear" onclick="clear_ep('replace')">Limpar</button>
+                        </div>
+                        <div class="status" id="status_replace"></div>
+                        <div class="response-box" id="response_replace"></div>
+                    </div>
                 </div>
 
                 <!-- Audio Tab -->
@@ -992,7 +1043,7 @@
                 'lw': 'video_lw', 'sm': 'video_sm', 'opt': 'video_opt', 'bd': 'video_bd',
                 'cmp': 'video_cmp', 'cvt': 'video_cvt', 'trm': 'video_trm', 'rsz': 'video_rsz',
                 'wtr': 'video_wtr', 'thm': 'video_thm', 'extr': 'video_extr', 'tts': null,
-                'acvt': 'audio_cvt', 'gsub': 'video_gsub', 'asub': 'video_asub', 'csub': 'sub_csub', 'rmlogo': 'video_rmlogo', 'addlogo': 'video_addlogo'
+                'acvt': 'audio_cvt', 'gsub': 'video_gsub', 'asub': 'video_asub', 'csub': 'sub_csub', 'rmlogo': 'video_rmlogo', 'addlogo': 'video_addlogo', 'replace': 'video_replace'
             };
 
             if (fileInputs[id] && document.getElementById(fileInputs[id])) {
@@ -1009,6 +1060,9 @@
             }
             if (id === 'addlogo' && document.getElementById('logo_addlogo').files[0]) {
                 formData.append('logo', document.getElementById('logo_addlogo').files[0]);
+            }
+            if (id === 'replace' && document.getElementById('logo_replace').files[0]) {
+                formData.append('logo', document.getElementById('logo_replace').files[0]);
             }
 
             // Add parameters
@@ -1027,7 +1081,8 @@
                 'acvt': { format: 'fmt_acvt' },
                 'csub': { format: 'fmt_csub' },
                 'rmlogo': { method: 'method_rmlogo', logoX: 'logox_rmlogo', logoY: 'logoy_rmlogo', logoWidth: 'logow_rmlogo', logoHeight: 'logoh_rmlogo', cropTop: 'cropt_rmlogo', cropBottom: 'cropb_rmlogo' },
-                'addlogo': { position: 'pos_addlogo', scale: 'scale_addlogo', opacity: 'opacity_addlogo', margin: 'margin_addlogo', x: 'x_addlogo', y: 'y_addlogo' }
+                'addlogo': { position: 'pos_addlogo', scale: 'scale_addlogo', opacity: 'opacity_addlogo', margin: 'margin_addlogo', x: 'x_addlogo', y: 'y_addlogo' },
+                'replace': { logoX: 'oldlogox_replace', logoY: 'oldlogoy_replace', logoWidth: 'oldlogow_replace', logoHeight: 'oldlogoh_replace', newLogoX: 'newlogox_replace', newLogoY: 'newlogoy_replace', logoScale: 'scale_replace' }
             };
 
             if (paramMap[id]) {

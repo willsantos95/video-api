@@ -8,7 +8,12 @@ const getOutputPath = (inputPath, suffix, format = 'mp4') => {
   return path.join(dir, `${basename}_${suffix}.${format}`);
 };
 
+const getExecutionTime = (startTime) => {
+  return parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
+};
+
 const compressVideo = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -30,6 +35,7 @@ const compressVideo = (req, res) => {
         success: true,
         message: 'Vídeo comprimido com sucesso',
         file: path.basename(outputPath),
+        executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
     })
@@ -40,6 +46,7 @@ const compressVideo = (req, res) => {
 };
 
 const convertFormat = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -55,6 +62,7 @@ const convertFormat = (req, res) => {
         success: true,
         message: `Vídeo convertido para ${format}`,
         file: path.basename(outputPath),
+        executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
     })
@@ -65,6 +73,7 @@ const convertFormat = (req, res) => {
 };
 
 const trimVideo = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -86,6 +95,7 @@ const trimVideo = (req, res) => {
         success: true,
         message: 'Vídeo cortado com sucesso',
         file: path.basename(outputPath),
+        executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
     })
@@ -96,6 +106,7 @@ const trimVideo = (req, res) => {
 };
 
 const resizeVideo = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -117,6 +128,7 @@ const resizeVideo = (req, res) => {
         message: 'Vídeo redimensionado com sucesso',
         file: path.basename(outputPath),
         resolution: `${width}x${height}`,
+        executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
     })
@@ -127,6 +139,7 @@ const resizeVideo = (req, res) => {
 };
 
 const addWatermark = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -156,6 +169,7 @@ const addWatermark = (req, res) => {
         success: true,
         message: 'Marca d\'água adicionada com sucesso',
         file: path.basename(outputPath),
+        executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
     })
@@ -166,6 +180,7 @@ const addWatermark = (req, res) => {
 };
 
 const extractThumbnail = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -183,6 +198,7 @@ const extractThumbnail = (req, res) => {
         success: true,
         message: 'Miniatura extraída com sucesso',
         file: path.basename(outputPath),
+        executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
     })
@@ -193,6 +209,7 @@ const extractThumbnail = (req, res) => {
 };
 
 const mergeVideos = (req, res) => {
+  const startTime = Date.now();
   if (!req.files || req.files.length < 2) {
     return res.status(400).json({ error: 'Mínimo 2 vídeos necessários' });
   }
@@ -215,6 +232,7 @@ const mergeVideos = (req, res) => {
         success: true,
         message: 'Vídeos unificados com sucesso',
         file: path.basename(outputPath),
+        executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
     })
@@ -225,6 +243,7 @@ const mergeVideos = (req, res) => {
 };
 
 const removeLogo = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -263,6 +282,7 @@ const removeLogo = (req, res) => {
         message: `Logo removido com método: ${method}`,
         file: path.basename(outputPath),
         method: method,
+        executionTime: getExecutionTime(startTime),
         parameters: {
           logoX,
           logoY,
@@ -281,6 +301,7 @@ const removeLogo = (req, res) => {
 };
 
 const addLogo = (req, res) => {
+  const startTime = Date.now();
   if (!req.files || !req.files.video || !req.files.logo) {
     return res.status(400).json({ error: 'Vídeo e logo são obrigatórios' });
   }
@@ -334,6 +355,7 @@ const addLogo = (req, res) => {
         file: path.basename(outputPath),
         scale: scale,
         opacity: opacity,
+        executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       };
 
@@ -354,6 +376,78 @@ const addLogo = (req, res) => {
     .run();
 };
 
+const removeAndAddLogo = (req, res) => {
+  const startTime = Date.now();
+  if (!req.files || !req.files.video || !req.files.logo) {
+    return res.status(400).json({ error: 'Vídeo e logo são obrigatórios' });
+  }
+
+  const videoFile = req.files.video[0];
+  const logoFile = req.files.logo[0];
+
+  if (!videoFile || !logoFile) {
+    return res.status(400).json({ error: 'Vídeo e logo são obrigatórios' });
+  }
+
+  const videoPath = videoFile.path;
+  const logoPath = logoFile.path;
+  const {
+    logoX = '10',
+    logoY = '10',
+    logoWidth = '200',
+    logoHeight = '100',
+    newLogoX = '50',
+    newLogoY = '50',
+    logoScale = '0.2'
+  } = req.body;
+
+  const intermediateOutputPath = path.join(path.dirname(videoPath), `no_old_logo_${Date.now()}.mp4`);
+  const finalOutputPath = path.join(path.dirname(videoPath), `replaced_logo_${Date.now()}.mp4`);
+
+  ffmpeg(videoPath)
+    .output(intermediateOutputPath)
+    .videoFilters(`delogo=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}`)
+    .outputOptions(['-c:a copy'])
+    .on('end', () => {
+      ffmpeg(intermediateOutputPath)
+        .input(logoPath)
+        .output(finalOutputPath)
+        .complexFilter(`[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[0:v][logo]overlay=x=${newLogoX}:y=${newLogoY}`)
+        .outputOptions(['-c:a aac', '-b:a 128k', '-c:v libx264', '-pix_fmt yuv420p'])
+        .on('end', () => {
+          fs.unlinkSync(intermediateOutputPath);
+          res.json({
+            success: true,
+            message: 'Logo removido e novo logo adicionado com sucesso',
+            file: path.basename(finalOutputPath),
+            oldLogoRemoval: {
+              method: 'blur (delogo)',
+              x: logoX,
+              y: logoY,
+              width: logoWidth,
+              height: logoHeight
+            },
+            newLogoAdded: {
+              x: newLogoX,
+              y: newLogoY,
+              scale: logoScale
+            },
+            executionTime: getExecutionTime(startTime),
+            url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(finalOutputPath)}`
+          });
+        })
+        .on('error', (err) => {
+          fs.unlinkSync(intermediateOutputPath);
+          res.status(500).json({ error: 'Erro ao adicionar novo logo: ' + err.message });
+        })
+        .run();
+    })
+    .on('error', (err) => {
+      res.status(500).json({ error: 'Erro ao remover logo antigo: ' + err.message });
+    })
+    .run();
+};
+
 module.exports = {
   compressVideo,
   convertFormat,
@@ -363,5 +457,6 @@ module.exports = {
   extractThumbnail,
   mergeVideos,
   removeLogo,
-  addLogo
+  addLogo,
+  removeAndAddLogo
 };

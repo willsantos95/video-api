@@ -8,8 +8,14 @@ const getOutputPath = (inputPath, suffix, format = 'mp4') => {
   return path.join(dir, `${basename}_${suffix}.${format}`);
 };
 
+const getExecutionTime = (startTime) => {
+  return parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
+};
+
 // Adicionar borda simples (letterbox)
 const addBorder = (req, res) => {
+  const startTime = Date.now();
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -27,6 +33,7 @@ const addBorder = (req, res) => {
     .on('end', () => {
       res.json({
         success: true,
+        executionTime: getExecutionTime(startTime),
         message: 'Borda adicionada com sucesso',
         file: path.basename(outputPath),
         borderSize: borderSize,
@@ -42,6 +49,7 @@ const addBorder = (req, res) => {
 
 // Adicionar borda gradiente (mais elegante)
 const addGradientBorder = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -60,6 +68,7 @@ const addGradientBorder = (req, res) => {
     .on('end', () => {
       res.json({
         success: true,
+        executionTime: getExecutionTime(startTime),
         message: 'Borda gradiente adicionada com sucesso',
         file: path.basename(outputPath),
         borderSize: borderSize,
@@ -74,6 +83,7 @@ const addGradientBorder = (req, res) => {
 
 // Adicionar borda com padrão (xadrez, linhas)
 const addPatternBorder = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -101,6 +111,7 @@ const addPatternBorder = (req, res) => {
     .on('end', () => {
       res.json({
         success: true,
+        executionTime: getExecutionTime(startTime),
         message: `Borda padrão (${pattern}) adicionada com sucesso`,
         file: path.basename(outputPath),
         pattern: pattern,
@@ -115,6 +126,7 @@ const addPatternBorder = (req, res) => {
 
 // Adicionar efeito blur nos lados
 const addBlurSides = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -134,6 +146,7 @@ const addBlurSides = (req, res) => {
     .on('end', () => {
       res.json({
         success: true,
+        executionTime: getExecutionTime(startTime),
         message: 'Efeito blur adicionado com sucesso',
         file: path.basename(outputPath),
         blurWidth: blurWidth,
@@ -148,6 +161,7 @@ const addBlurSides = (req, res) => {
 
 // Adicionar vinheta (efeito nas bordas)
 const addVignette = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -164,6 +178,7 @@ const addVignette = (req, res) => {
     .on('end', () => {
       res.json({
         success: true,
+        executionTime: getExecutionTime(startTime),
         message: 'Efeito vinheta adicionado com sucesso',
         file: path.basename(outputPath),
         intensity: intensity,
@@ -178,6 +193,7 @@ const addVignette = (req, res) => {
 
 // Adicionar zoom/crop (cortar um pouco)
 const addZoomEffect = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -194,6 +210,7 @@ const addZoomEffect = (req, res) => {
     .on('end', () => {
       res.json({
         success: true,
+        executionTime: getExecutionTime(startTime),
         message: 'Efeito zoom aplicado com sucesso',
         file: path.basename(outputPath),
         zoomLevel: zoomLevel,
@@ -208,6 +225,7 @@ const addZoomEffect = (req, res) => {
 
 // Adicionar filtro de cor leve (ajusta matiz/saturação)
 const addColorFilter = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -244,6 +262,7 @@ const addColorFilter = (req, res) => {
     .on('end', () => {
       res.json({
         success: true,
+        executionTime: getExecutionTime(startTime),
         message: `Filtro ${filterType} aplicado com sucesso`,
         file: path.basename(outputPath),
         filterType: filterType,
@@ -258,6 +277,7 @@ const addColorFilter = (req, res) => {
 
 // Combinado: Borda + Filtro (o melhor para Instagram)
 const instagramOptimized = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -297,6 +317,7 @@ const instagramOptimized = (req, res) => {
     .on('end', () => {
       res.json({
         success: true,
+        executionTime: getExecutionTime(startTime),
         message: 'Vídeo otimizado para Instagram (anti-detection) com sucesso',
         file: path.basename(outputPath),
         optimizations: {
@@ -318,6 +339,7 @@ const instagramOptimized = (req, res) => {
 
 // Novo: Apenas Borda Simples (sem nenhum outro efeito)
 const simpleAntiDetection = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -346,6 +368,7 @@ const simpleAntiDetection = (req, res) => {
     .on('end', () => {
       res.json({
         success: true,
+        executionTime: getExecutionTime(startTime),
         message: 'Vídeo com borda simples criado com sucesso (sem efeitos adicionais)',
         file: path.basename(outputPath),
         optimizations: {
@@ -365,6 +388,7 @@ const simpleAntiDetection = (req, res) => {
 
 // Lightweight: Mudanças MÍNIMAS para anti-detection
 const lightweightAntiDetection = (req, res) => {
+  const startTime = Date.now();
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
@@ -398,6 +422,7 @@ const lightweightAntiDetection = (req, res) => {
     .on('end', () => {
       res.json({
         success: true,
+        executionTime: getExecutionTime(startTime),
         message: 'Vídeo lightweight anti-detection criado com sucesso',
         file: path.basename(outputPath),
         modifications: {
