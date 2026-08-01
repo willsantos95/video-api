@@ -440,16 +440,17 @@ const removeAndAddLogo = (req, res) => {
   ffmpeg(videoPath)
     .input(logoPath)
     .output(finalOutputPath)
-    .complexFilter(complexFilterStr, ['out'])
     .outputOptions([
-      '-c:v libx264',
+      '-filter_complex', complexFilterStr,
+      '-map', '[out]',
+      '-map', '0:a:0',
+      '-c:v', 'libx264',
       `-crf ${quality}`,
-      '-preset fast',
-      '-c:a aac',
-      '-b:a 128k',
-      '-pix_fmt yuv420p'
+      '-preset', 'fast',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-pix_fmt', 'yuv420p'
     ])
-    .map('0:a:0')
     .on('end', () => {
       res.json({
         success: true,
