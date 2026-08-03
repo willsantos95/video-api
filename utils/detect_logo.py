@@ -15,7 +15,6 @@ def detect_logo(frame_path, logo_path, output_path):
         if frame is None or template is None:
             raise ValueError("Could not read frame or template image")
 
-        # Converte para grayscale
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
 
@@ -27,28 +26,28 @@ def detect_logo(frame_path, logo_path, output_path):
         best_width = 0
         best_height = 0
 
-        # Busca muito mais granular
-        # 0.30 até 1.50 em passos de 0.01
-        scales = np.arange(0.30, 1.51, 0.01)
+        # Evita templates pequenos demais
+        scales = np.arange(0.40, 1.21, 0.01)
 
         for scale in scales:
 
             width = int(template_width * scale)
             height = int(template_height * scale)
 
-            # Evita dimensões inválidas
-            if width < 10 or height < 10:
+            if width < 40 or height < 25:
                 continue
 
-            # Evita template maior que o frame
-            if width > frame_gray.shape[1] or height > frame_gray.shape[0]:
+            if (
+                width > frame_gray.shape[1]
+                or height > frame_gray.shape[0]
+            ):
                 continue
 
-            # INTER_AREA é melhor quando estamos diminuindo
-            if scale < 1:
-                interpolation = cv2.INTER_AREA
-            else:
-                interpolation = cv2.INTER_CUBIC
+            interpolation = (
+                cv2.INTER_AREA
+                if scale < 1
+                else cv2.INTER_CUBIC
+            )
 
             scaled_template = cv2.resize(
                 template_gray,
@@ -72,31 +71,143 @@ def detect_logo(frame_path, logo_path, output_path):
                 best_width = width
                 best_height = height
 
-        # Threshold
-        threshold = 0.50
+        # ----------------------------------------------------
+        # Nenhum candidato
+        # ----------------------------------------------------
 
-        if best_match is None or best_confidence < threshold:
+        if best_match is None:
 
             results = {
                 "success": False,
-                "confidence": float(max(best_confidence, 0)),
-                "scale": float(best_scale),
-                "message": "Logo not detected in frame"
+                "confidence": 0,
+                "message": "Logo not detected"
             }
 
         else:
 
             x, y = best_match
 
-            results = {
-                "success": True,
-                "x": int(x),
-                "y": int(y),
-                "width": int(best_width),
-                "height": int(best_height),
-                "confidence": float(best_confidence),
-                "scale": float(best_scale)
-            }
+            # ------------------------------------------------
+            # VALIDAÇÃO 1 — grayscale
+            # ------------------------------------------------
+
+            gray_confidence = best_confidence
+
+            # ------------------------------------------------
+            # Prepara template colorido
+            # ------------------------------------------------
+
+            scaled_template_color = cv2.resize(
+                template,
+                (best_width, best_height),
+                interpolation=cv2.INTER_AREA
+            )
+
+            # Região candidata
+            roi_color = frame[
+                y:y + best_height,
+                x:x + best_width
+            ]
+
+            # ------------------------------------------------
+            # VALIDAÇÃO 2 — cores
+            # ------------------------------------------------
+
+            color_result = cv2.matchTemplate(
+                roi_color,
+                scaled_template_color,
+                cv2.TM_CCOEFF_NORMED
+            )
+
+            color_confidence = float(color_result[0][0])
+
+            # ------------------------------------------------
+            # VALIDAÇÃO 3 — bordas
+            # ------------------------------------------------
+
+            roi_gray = cv2.cvtColor(
+                roi_color,
+                cv2.COLOR_BGR2GRAY
+            )
+
+            template_validation_gray = cv2.cvtColor(
+                scaled_template_color,
+                cv2.COLOR_BGR2GRAY
+            )
+
+            roi_edges = cv2.Canny(
+                roi_gray,
+                50,
+                150
+            )
+
+            template_edges = cv2.Canny(
+                template_validation_gray,
+                50,
+                150
+            )
+
+            edge_result = cv2.matchTemplate(
+                roi_edges,
+                template_edges,
+                cv2.TM_CCOEFF_NORMED
+            )
+
+            edge_confidence = float(edge_result[0][0])
+
+            # ------------------------------------------------
+            # Confiança final
+            # ------------------------------------------------
+
+            final_confidence = (
+                gray_confidence * 0.50 +
+                color_confidence * 0.35 +
+                edge_confidence * 0.15
+            )
+
+            # ------------------------------------------------
+            # Regras para aceitar
+            # ------------------------------------------------
+
+            logo_detected = (
+                gray_confidence >= 0.70
+                and color_confidence >= 0.60
+                and edge_confidence >= 0.30
+            )
+
+            if logo_detected:
+
+                results = {
+                    "success": True,
+                    "x": int(x),
+                    "y": int(y),
+                    "width": int(best_width),
+                    "height": int(best_height),
+
+                    "confidence": float(final_confidence),
+
+                    "gray_confidence": float(gray_confidence),
+                    "color_confidence": float(color_confidence),
+                    "edge_confidence": float(edge_confidence),
+
+                    "scale": float(best_scale)
+                }
+
+            else:
+
+                results = {
+                    "success": False,
+
+                    "confidence": float(final_confidence),
+
+                    "gray_confidence": float(gray_confidence),
+                    "color_confidence": float(color_confidence),
+                    "edge_confidence": float(edge_confidence),
+
+                    "scale": float(best_scale),
+
+                    "message": "Possible false positive"
+                }
 
         with open(output_path, "w") as f:
             json.dump(results, f)
@@ -115,7 +226,10 @@ def detect_logo(frame_path, logo_path, output_path):
         with open(output_path, "w") as f:
             json.dump(results, f)
 
-        print(json.dumps(results), file=sys.stderr)
+        print(
+            json.dumps(results),
+            file=sys.stderr
+        )
 
         sys.exit(1)
 
@@ -123,18 +237,16 @@ def detect_logo(frame_path, logo_path, output_path):
 if __name__ == "__main__":
 
     if len(sys.argv) < 4:
+
         print(
             "Usage: python detect_logo.py "
             "<frame_path> <logo_path> <output_path>"
         )
+
         sys.exit(1)
 
-    frame_path = sys.argv[1]
-    logo_path = sys.argv[2]
-    output_path = sys.argv[3]
-
     detect_logo(
-        frame_path,
-        logo_path,
-        output_path
+        sys.argv[1],
+        sys.argv[2],
+        sys.argv[3]
     )
