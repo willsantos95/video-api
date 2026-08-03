@@ -488,6 +488,61 @@ const removeAndAddLogo = (req, res) => {
     .run();
 };
 
+const convertToReelsFormat = (req, res) => {
+  const startTime = Date.now();
+  if (!req.file) {
+    return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+  }
+
+  const { mode = 'crop', backgroundColor = 'black', quality = '28' } = req.body;
+  // mode: 'crop' (corta o vídeo) ou 'pad' (adiciona barras pretas)
+
+  const inputPath = req.file.path;
+  const outputPath = getOutputPath(inputPath, 'reels-1080x1920');
+
+  // Dimensões Reels/Shorts: 1080x1920 (vertical)
+  const targetWidth = 1080;
+  const targetHeight = 1920;
+
+  let filterStr;
+
+  if (mode === 'pad') {
+    // Adiciona barras pretas (letterbox/pillarbox) para manter aspect ratio
+    filterStr = `scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease,pad=${targetWidth}:${targetHeight}:(ow-iw)/2:(oh-ih)/2:color=${backgroundColor}`;
+  } else {
+    // Corta a imagem para 1080x1920 (center crop)
+    filterStr = `scale=${targetWidth}:-1,crop=${targetWidth}:${targetHeight}:(in_w-${targetWidth})/2:(in_h-${targetHeight})/2`;
+  }
+
+  ffmpeg(inputPath)
+    .output(outputPath)
+    .videoFilters(filterStr)
+    .outputOptions([
+      '-c:v', 'libx264',
+      `-crf ${quality}`,
+      '-preset', 'fast',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-pix_fmt', 'yuv420p'
+    ])
+    .on('end', () => {
+      res.json({
+        success: true,
+        message: 'Vídeo convertido para formato Reels/Shorts (1080x1920)',
+        file: path.basename(outputPath),
+        format: '1080x1920',
+        mode: mode,
+        backgroundColor: mode === 'pad' ? backgroundColor : null,
+        executionTime: getExecutionTime(startTime),
+        url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
+      });
+    })
+    .on('error', (err) => {
+      res.status(500).json({ error: err.message });
+    })
+    .run();
+};
+
 module.exports = {
   compressVideo,
   convertFormat,
@@ -498,5 +553,6 @@ module.exports = {
   mergeVideos,
   removeLogo,
   addLogo,
-  removeAndAddLogo
+  removeAndAddLogo,
+  convertToReelsFormat
 };

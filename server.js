@@ -47,6 +47,7 @@ app.post('/api/video/merge', upload.array('videos', 10), videoController.mergeVi
 app.post('/api/video/remove-logo', upload.single('video'), videoController.removeLogo);
 app.post('/api/video/add-logo', upload.fields([{ name: 'video' }, { name: 'logo' }]), videoController.addLogo);
 app.post('/api/video/replace-logo', upload.fields([{ name: 'video' }, { name: 'logo' }]), videoController.removeAndAddLogo);
+app.post('/api/video/to-reels', upload.single('video'), videoController.convertToReelsFormat);
 app.post('/api/video/detect-logo', upload.fields([{ name: 'video' }, { name: 'logo' }]), logoDetectionController.detectLogo);
 
 // Rotas de áudio
