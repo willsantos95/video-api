@@ -26,7 +26,7 @@ def detect_logo(frame_path, logo_path, output_path):
         best_width = 0
         best_height = 0
 
-        # Evita templates pequenos demais
+        # Busca em múltiplas escalas
         scales = np.arange(0.40, 1.21, 0.01)
 
         for scale in scales:
@@ -64,43 +64,38 @@ def detect_logo(frame_path, logo_path, output_path):
             _, max_val, _, max_loc = cv2.minMaxLoc(result)
 
             if max_val > best_confidence:
-
                 best_confidence = max_val
                 best_match = max_loc
                 best_scale = scale
                 best_width = width
                 best_height = height
 
-        # ----------------------------------------------------
         # Nenhum candidato
-        # ----------------------------------------------------
-
         if best_match is None:
 
             results = {
                 "success": False,
                 "confidence": 0,
-                "message": "Logo not detected"
+                "message": "Logo not detected in frame"
             }
 
         else:
 
             x, y = best_match
 
-            # ------------------------------------------------
-            # VALIDAÇÃO 1 — grayscale
-            # ------------------------------------------------
-
             gray_confidence = best_confidence
 
-            # ------------------------------------------------
-            # Prepara template colorido
-            # ------------------------------------------------
+            # Template colorido na escala encontrada
+            interpolation = (
+                cv2.INTER_AREA
+                if best_scale < 1
+                else cv2.INTER_CUBIC
+            )
 
             scaled_template_color = cv2.resize(
                 template,
                 (best_width, best_height),
-                interpolation=cv2.INTER_AREA
+                interpolation=interpolation
             )
 
             # Região candidata
@@ -109,9 +104,9 @@ def detect_logo(frame_path, logo_path, output_path):
                 x:x + best_width
             ]
 
-            # ------------------------------------------------
-            # VALIDAÇÃO 2 — cores
-            # ------------------------------------------------
+            # ----------------------------------------
+            # Validação por cor
+            # ----------------------------------------
 
             color_result = cv2.matchTemplate(
                 roi_color,
@@ -119,11 +114,13 @@ def detect_logo(frame_path, logo_path, output_path):
                 cv2.TM_CCOEFF_NORMED
             )
 
-            color_confidence = float(color_result[0][0])
+            _, color_confidence, _, _ = cv2.minMaxLoc(
+                color_result
+            )
 
-            # ------------------------------------------------
-            # VALIDAÇÃO 3 — bordas
-            # ------------------------------------------------
+            # ----------------------------------------
+            # Validação por bordas
+            # ----------------------------------------
 
             roi_gray = cv2.cvtColor(
                 roi_color,
@@ -153,21 +150,23 @@ def detect_logo(frame_path, logo_path, output_path):
                 cv2.TM_CCOEFF_NORMED
             )
 
-            edge_confidence = float(edge_result[0][0])
-
-            # ------------------------------------------------
-            # Confiança final
-            # ------------------------------------------------
-
-            final_confidence = (
-                gray_confidence * 0.50 +
-                color_confidence * 0.35 +
-                edge_confidence * 0.15
+            _, edge_confidence, _, _ = cv2.minMaxLoc(
+                edge_result
             )
 
-            # ------------------------------------------------
-            # Regras para aceitar
-            # ------------------------------------------------
+            # ----------------------------------------
+            # Confiança combinada
+            # ----------------------------------------
+
+            final_confidence = (
+                gray_confidence * 0.50
+                + color_confidence * 0.35
+                + edge_confidence * 0.15
+            )
+
+            # ----------------------------------------
+            # Regras de validação
+            # ----------------------------------------
 
             logo_detected = (
                 gray_confidence >= 0.70
@@ -177,38 +176,27 @@ def detect_logo(frame_path, logo_path, output_path):
 
             if logo_detected:
 
+                # Mesmo retorno antigo
                 results = {
                     "success": True,
                     "x": int(x),
                     "y": int(y),
                     "width": int(best_width),
                     "height": int(best_height),
-
                     "confidence": float(final_confidence),
-
-                    "gray_confidence": float(gray_confidence),
-                    "color_confidence": float(color_confidence),
-                    "edge_confidence": float(edge_confidence),
-
                     "scale": float(best_scale)
                 }
 
             else:
 
+                # Mesmo retorno antigo
                 results = {
                     "success": False,
-
-                    "confidence": float(final_confidence),
-
-                    "gray_confidence": float(gray_confidence),
-                    "color_confidence": float(color_confidence),
-                    "edge_confidence": float(edge_confidence),
-
-                    "scale": float(best_scale),
-
-                    "message": "Possible false positive"
+                    "confidence": 0,
+                    "message": "Logo not detected in frame"
                 }
 
+        # Salva JSON
         with open(output_path, "w") as f:
             json.dump(results, f)
 
@@ -245,8 +233,12 @@ if __name__ == "__main__":
 
         sys.exit(1)
 
+    frame_path = sys.argv[1]
+    logo_path = sys.argv[2]
+    output_path = sys.argv[3]
+
     detect_logo(
-        sys.argv[1],
-        sys.argv[2],
-        sys.argv[3]
+        frame_path,
+        logo_path,
+        output_path
     )
