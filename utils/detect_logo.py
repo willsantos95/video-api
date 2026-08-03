@@ -19,7 +19,7 @@ ROI_WIDTH = 352
 ROI_HEIGHT = 241
 
 
-def detect_logo_template_matching(frame, template, min_confidence=0.75):
+def detect_logo_template_matching(frame, template, min_confidence=0.65):
     """Template matching method with ROI (Region of Interest)"""
     # Extract ROI from frame
     roi = frame[ROI_Y:ROI_Y+ROI_HEIGHT, ROI_X:ROI_X+ROI_WIDTH]
@@ -32,7 +32,8 @@ def detect_logo_template_matching(frame, template, min_confidence=0.75):
     best_confidence = 0
     best_scale = 1.0
 
-    for scale in [0.5, 0.7, 0.9, 1.0, 1.2, 1.5, 2.0]:
+    # Extended scale range for smaller logos
+    for scale in [0.3, 0.4, 0.5, 0.7, 0.9, 1.0, 1.2, 1.5, 2.0]:
         scaled_template = cv2.resize(
             template_gray,
             (int(template_width * scale), int(template_height * scale))
@@ -157,8 +158,8 @@ def validate_color_match(frame, template, detection):
 
 def detect_logo(frame_path, logo_path, output_path):
     """
-    Detect logo with false positive filtering
-    Uses: template matching (0.80 threshold) + feature matching + color validation
+    Detect logo with ROI and validation
+    Uses: template matching (0.54 threshold) + size validation
     """
     try:
         frame = cv2.imread(frame_path)
@@ -167,8 +168,10 @@ def detect_logo(frame_path, logo_path, output_path):
         if frame is None or template is None:
             raise ValueError("Could not read frame or template image")
 
-        # Try template matching first (faster, but higher threshold to avoid false positives)
-        detection = detect_logo_template_matching(frame, template, min_confidence=0.80)
+        template_h, template_w = template.shape[:2]
+
+        # Try template matching first (lower threshold to catch all logos)
+        detection = detect_logo_template_matching(frame, template, min_confidence=0.50)
 
         if detection is None:
             # Fallback to feature matching (more robust)
@@ -181,12 +184,22 @@ def detect_logo(frame_path, logo_path, output_path):
                 "message": "Logo not detected in frame"
             }
         else:
-            # Validate with color matching to filter false positives
-            if not validate_color_match(frame, template, detection):
+            # Validate logo size (must be similar to original template)
+            detected_w = detection["width"]
+            detected_h = detection["height"]
+
+            # Check if detected size is reasonable (25% to 175% of template)
+            # Logos can vary in size but shouldstay within reasonable bounds
+            size_ratio_w = detected_w / template_w
+            size_ratio_h = detected_h / template_h
+
+            is_valid_size = (0.25 <= size_ratio_w <= 1.75) and (0.25 <= size_ratio_h <= 1.75)
+
+            if not is_valid_size:
                 results = {
                     "success": False,
                     "confidence": 0,
-                    "message": "Logo match failed color validation (false positive filtered)"
+                    "message": "Logo match failed size validation (false positive filtered)"
                 }
             else:
                 results = {
