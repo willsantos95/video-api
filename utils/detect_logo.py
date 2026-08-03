@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Logo detection using OpenCV template matching + feature matching
-Detects logo position in a video frame with false positive filtering
+Detects logo position in a video frame with ROI (Region of Interest)
+Fixed ROI optimized for "Cortes Humor" logo position
 """
 
 import cv2
@@ -10,10 +11,20 @@ import sys
 from pathlib import Path
 import numpy as np
 
+# Fixed ROI - optimized for logo position across all videos
+# Analyzed from 4 videos: covers all logo positions
+ROI_X = 28
+ROI_Y = 219
+ROI_WIDTH = 352
+ROI_HEIGHT = 241
 
-def detect_logo_template_matching(frame, template, min_confidence=0.80):
-    """Template matching method with higher threshold"""
-    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+def detect_logo_template_matching(frame, template, min_confidence=0.75):
+    """Template matching method with ROI (Region of Interest)"""
+    # Extract ROI from frame
+    roi = frame[ROI_Y:ROI_Y+ROI_HEIGHT, ROI_X:ROI_X+ROI_WIDTH]
+
+    frame_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
     template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
     template_height, template_width = template_gray.shape
 
@@ -48,9 +59,10 @@ def detect_logo_template_matching(frame, template, min_confidence=0.80):
     w = int(template_width * best_scale)
     h = int(template_height * best_scale)
 
+    # Convert back to full frame coordinates
     return {
-        "x": int(x),
-        "y": int(y),
+        "x": int(x + ROI_X),
+        "y": int(y + ROI_Y),
         "width": int(w),
         "height": int(h),
         "confidence": float(best_confidence),
@@ -60,9 +72,12 @@ def detect_logo_template_matching(frame, template, min_confidence=0.80):
 
 
 def detect_logo_feature_matching(frame, template):
-    """Feature matching using ORB (more robust to variations)"""
+    """Feature matching using ORB with ROI (more robust to variations)"""
     try:
-        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Extract ROI from frame
+        roi = frame[ROI_Y:ROI_Y+ROI_HEIGHT, ROI_X:ROI_X+ROI_WIDTH]
+
+        frame_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
 
         orb = cv2.ORB_create(nfeatures=500)
@@ -107,9 +122,11 @@ def detect_logo_feature_matching(frame, template):
             return None
 
         confidence = min(len(good_matches) / 50.0, 1.0)
+
+        # Convert back to full frame coordinates
         return {
-            "x": x,
-            "y": y,
+            "x": x + ROI_X,
+            "y": y + ROI_Y,
             "width": width,
             "height": height,
             "confidence": float(confidence),
