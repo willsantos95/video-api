@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Logo detection using OpenCV template matching + feature matching
-Detects logo position in a video frame with ROI (Region of Interest)
-Fixed ROI optimized for "Cortes Humor" logo position
+Detects logo position in a video frame with dynamic ROI calculation
+Handles multiple frame validation and returns reliable coordinates
 """
 
 import cv2
@@ -11,18 +11,36 @@ import sys
 from pathlib import Path
 import numpy as np
 
-# Fixed ROI - optimized for logo position across all videos
-# Analyzed from 4 videos: covers all logo positions
-ROI_X = 28
-ROI_Y = 219
-ROI_WIDTH = 352
-ROI_HEIGHT = 241
+
+def calculate_dynamic_roi(frame_shape, template_shape):
+    """
+    Calculate dynamic ROI based on frame and template dimensions
+    Assumes logo is typically in the lower left/center portion of frame
+    """
+    frame_h, frame_w = frame_shape[:2]
+    template_h, template_w = template_shape[:2]
+
+    roi_y = int(frame_h * 0.3)
+    roi_x = int(frame_w * 0.02)
+    roi_height = int(frame_h * 0.65)
+    roi_width = int(frame_w * 0.6)
+
+    return {
+        'x': roi_x,
+        'y': roi_y,
+        'width': roi_width,
+        'height': roi_height
+    }
 
 
-def detect_logo_template_matching(frame, template, min_confidence=0.65):
-    """Template matching method with ROI (Region of Interest)"""
-    # Extract ROI from frame
-    roi = frame[ROI_Y:ROI_Y+ROI_HEIGHT, ROI_X:ROI_X+ROI_WIDTH]
+def detect_logo_template_matching(frame, template, roi_params, min_confidence=0.70):
+    """Template matching with dynamic ROI - more reliable detection"""
+    roi_x = roi_params['x']
+    roi_y = roi_params['y']
+    roi_width = roi_params['width']
+    roi_height = roi_params['height']
+
+    roi = frame[roi_y:roi_y+roi_height, roi_x:roi_x+roi_width]
 
     frame_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
     template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
@@ -32,8 +50,7 @@ def detect_logo_template_matching(frame, template, min_confidence=0.65):
     best_confidence = 0
     best_scale = 1.0
 
-    # Extended scale range for smaller logos
-    for scale in [0.3, 0.4, 0.5, 0.7, 0.9, 1.0, 1.2, 1.5, 2.0]:
+    for scale in [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5]:
         scaled_template = cv2.resize(
             template_gray,
             (int(template_width * scale), int(template_height * scale))
@@ -60,10 +77,9 @@ def detect_logo_template_matching(frame, template, min_confidence=0.65):
     w = int(template_width * best_scale)
     h = int(template_height * best_scale)
 
-    # Convert back to full frame coordinates
     return {
-        "x": int(x + ROI_X),
-        "y": int(y + ROI_Y),
+        "x": int(x + roi_x),
+        "y": int(y + roi_y),
         "width": int(w),
         "height": int(h),
         "confidence": float(best_confidence),
@@ -72,11 +88,15 @@ def detect_logo_template_matching(frame, template, min_confidence=0.65):
     }
 
 
-def detect_logo_feature_matching(frame, template):
-    """Feature matching using ORB with ROI (more robust to variations)"""
+def detect_logo_feature_matching(frame, template, roi_params):
+    """Feature matching using ORB with ROI - more robust to variations"""
     try:
-        # Extract ROI from frame
-        roi = frame[ROI_Y:ROI_Y+ROI_HEIGHT, ROI_X:ROI_X+ROI_WIDTH]
+        roi_x = roi_params['x']
+        roi_y = roi_params['y']
+        roi_width = roi_params['width']
+        roi_height = roi_params['height']
+
+        roi = frame[roi_y:roi_y+roi_height, roi_x:roi_x+roi_width]
 
         frame_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
@@ -124,17 +144,33 @@ def detect_logo_feature_matching(frame, template):
 
         confidence = min(len(good_matches) / 50.0, 1.0)
 
-        # Convert back to full frame coordinates
         return {
-            "x": x + ROI_X,
-            "y": y + ROI_Y,
+            "x": x + roi_x,
+            "y": y + roi_y,
             "width": width,
             "height": height,
             "confidence": float(confidence),
             "method": "feature_matching"
         }
-    except:
+    except Exception as e:
         return None
+
+
+def validate_detection_coordinates(frame, detection):
+    """Validate that detection coordinates are within frame bounds and reasonable"""
+    frame_h, frame_w = frame.shape[:2]
+    x, y, w, h = detection["x"], detection["y"], detection["width"], detection["height"]
+
+    if x < 0 or y < 0 or w < 20 or h < 20:
+        return False, "Coordinates out of bounds"
+
+    if x + w > frame_w or y + h > frame_h:
+        return False, "Detection exceeds frame boundaries"
+
+    if w > frame_w * 0.8 or h > frame_h * 0.8:
+        return False, "Logo too large"
+
+    return True, "Valid"
 
 
 def validate_color_match(frame, template, detection):
@@ -144,22 +180,31 @@ def validate_color_match(frame, template, detection):
     if y + h > frame.shape[0] or x + w > frame.shape[1]:
         return False
 
-    frame_roi = frame[y:y+h, x:x+w]
-    template_hsv = cv2.cvtColor(template, cv2.COLOR_BGR2HSV)
-    frame_roi_hsv = cv2.cvtColor(frame_roi, cv2.COLOR_BGR2HSV)
+    try:
+        frame_roi = frame[int(y):int(y+h), int(x):int(x+w)]
+        if frame_roi.size == 0:
+            return False
 
-    frame_hist = cv2.calcHist([frame_roi_hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
-    template_hist = cv2.calcHist([template_hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
+        template_hsv = cv2.cvtColor(template, cv2.COLOR_BGR2HSV)
+        frame_roi_hsv = cv2.cvtColor(frame_roi, cv2.COLOR_BGR2HSV)
 
-    similarity = cv2.compareHist(frame_hist, template_hist, cv2.HISTCMP_BHATTACHARYYA)
+        frame_hist = cv2.calcHist([frame_roi_hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
+        template_hist = cv2.calcHist([template_hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
 
-    return similarity < 2.5
+        cv2.normalize(frame_hist, frame_hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+        cv2.normalize(template_hist, template_hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+
+        similarity = cv2.compareHist(frame_hist, template_hist, cv2.HISTCMP_BHATTACHARYYA)
+
+        return similarity < 2.5
+    except:
+        return False
 
 
 def detect_logo(frame_path, logo_path, output_path):
     """
-    Detect logo with ROI and validation
-    Uses: template matching (0.54 threshold) + size validation
+    Detect logo with dynamic ROI and comprehensive validation
+    Uses: template matching + feature matching with size/coordinate validation
     """
     try:
         frame = cv2.imread(frame_path)
@@ -169,52 +214,67 @@ def detect_logo(frame_path, logo_path, output_path):
             raise ValueError("Could not read frame or template image")
 
         template_h, template_w = template.shape[:2]
+        frame_h, frame_w = frame.shape[:2]
 
-        # Try template matching first (lower threshold to catch all logos)
-        detection = detect_logo_template_matching(frame, template, min_confidence=0.50)
+        roi_params = calculate_dynamic_roi(frame.shape, template.shape)
+
+        detection = None
+        confidence = 0
+
+        detection = detect_logo_template_matching(frame, template, roi_params, min_confidence=0.70)
 
         if detection is None:
-            # Fallback to feature matching (more robust)
-            detection = detect_logo_feature_matching(frame, template)
+            detection = detect_logo_feature_matching(frame, template, roi_params)
 
         if detection is None:
             results = {
                 "success": False,
                 "confidence": 0,
-                "message": "Logo not detected in frame"
+                "message": "Logo not detected in frame",
+                "frame_resolution": f"{frame_w}x{frame_h}"
             }
         else:
-            # Validate logo size (must be similar to original template)
-            detected_w = detection["width"]
-            detected_h = detection["height"]
-
-            # Check if detected size is reasonable (25% to 175% of template)
-            # Logos can vary in size but shouldstay within reasonable bounds
-            size_ratio_w = detected_w / template_w
-            size_ratio_h = detected_h / template_h
-
-            is_valid_size = (0.25 <= size_ratio_w <= 1.75) and (0.25 <= size_ratio_h <= 1.75)
-
-            if not is_valid_size:
+            is_valid, msg = validate_detection_coordinates(frame, detection)
+            if not is_valid:
                 results = {
                     "success": False,
-                    "confidence": 0,
-                    "message": "Logo match failed size validation (false positive filtered)"
+                    "confidence": detection["confidence"],
+                    "message": f"Detection failed validation: {msg}"
                 }
             else:
-                results = {
-                    "success": True,
-                    "x": detection["x"],
-                    "y": detection["y"],
-                    "width": detection["width"],
-                    "height": detection["height"],
-                    "confidence": detection["confidence"],
-                    "scale": detection.get("scale", 1.0),
-                    "method": detection.get("method", "template_matching")
-                }
+                detected_w = detection["width"]
+                detected_h = detection["height"]
+
+                size_ratio_w = detected_w / template_w
+                size_ratio_h = detected_h / template_h
+
+                is_valid_size = (0.2 <= size_ratio_w <= 2.0) and (0.2 <= size_ratio_h <= 2.0)
+
+                if not is_valid_size:
+                    results = {
+                        "success": False,
+                        "confidence": detection["confidence"],
+                        "message": "Logo match failed size validation",
+                        "size_ratios": {
+                            "width": float(size_ratio_w),
+                            "height": float(size_ratio_h)
+                        }
+                    }
+                else:
+                    results = {
+                        "success": True,
+                        "x": int(detection["x"]),
+                        "y": int(detection["y"]),
+                        "width": int(detection["width"]),
+                        "height": int(detection["height"]),
+                        "confidence": float(detection["confidence"]),
+                        "scale": float(detection.get("scale", 1.0)),
+                        "method": detection.get("method", "template_matching"),
+                        "frame_resolution": f"{frame_w}x{frame_h}"
+                    }
 
         with open(output_path, 'w') as f:
-            json.dump(results, f)
+            json.dump(results, f, indent=2)
 
         print(json.dumps(results))
         return results
@@ -225,7 +285,7 @@ def detect_logo(frame_path, logo_path, output_path):
             "error": str(e)
         }
         with open(output_path, 'w') as f:
-            json.dump(results, f)
+            json.dump(results, f, indent=2)
         print(json.dumps(results), file=sys.stderr)
         sys.exit(1)
 
