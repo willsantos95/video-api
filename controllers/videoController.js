@@ -12,6 +12,74 @@ const getExecutionTime = (startTime) => {
   return parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
 };
 
+const getVideoInfo = (req, res) => {
+  const startTime = Date.now();
+
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      error: 'Nenhum arquivo de vídeo enviado'
+    });
+  }
+
+  const videoPath = req.file.path;
+
+  try {
+    ffmpeg.ffprobe(videoPath, (err, metadata) => {
+      if (err) {
+        return res.status(500).json({
+          success: false,
+          error: 'Erro ao ler metadados do vídeo: ' + err.message,
+          executionTime: getExecutionTime(startTime)
+        });
+      }
+
+      try {
+        const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
+        const audioStream = metadata.streams.find(stream => stream.codec_type === 'audio');
+
+        if (!videoStream) {
+          return res.status(400).json({
+            success: false,
+            error: 'Nenhuma stream de vídeo encontrada',
+            executionTime: getExecutionTime(startTime)
+          });
+        }
+
+        const duration = parseFloat(metadata.format.duration || 0);
+        const bitrate = parseInt(metadata.format.bit_rate || 0);
+        const size = fs.statSync(videoPath).size;
+
+        let fps = 24;
+        if (videoStream.r_frame_rate) {
+          const [num, den] = videoStream.r_frame_rate.split('/');
+          fps = Math.round((parseInt(num) / parseInt(den)) * 100) / 100;
+        } else if (videoStream.avg_frame_rate) {
+          const [num, den] = videoStream.avg_frame_rate.split('/');
+          fps = Math.round((parseInt(num) / parseInt(den)) * 100) / 100;
+        }
+
+        const info = {
+          success: true,
+          video: {
+            width: videoStream.width,
+            height: videoStream.height,
+            duration: parseFloat(duration.toFixed(2)),
+            fps: fps,
+            codec: videoStream.codec_name,
+            bitrate: bitrate,
+            format: metadata.format.format_name,
+            size: size,
+            sizeFormatted: formatBytes(size),
+            resolution: `${videoStream.width}x${videoStream.height}`,
+            aspectRatio: videoStream.display_aspect_ratio || 'N/A'
+          },
+          audio: audioStream ? {
+            codec: audioStream.codec_name,
+            sampleRate: audioStream.sample_rate,
+            channels: audioStream.channels,
+            bitrate: audioStream.bit_rate\n          } : null,\n          filename: req.file.originalname,\n          executionTime: getExecutionTime(startTime)\n        };\n\n        res.json(info);\n      } catch (parseErr) {\n        res.status(500).json({\n          success: false,\n          error: 'Erro ao processar metadados: ' + parseErr.message,\n          executionTime: getExecutionTime(startTime)\n        });\n      }\n    });\n  } catch (err) {\n    res.status(500).json({\n      success: false,\n      error: err.message,\n      executionTime: getExecutionTime(startTime)\n    });\n  }\n};\n\nconst formatBytes = (bytes) => {\n  if (bytes === 0) return '0 Bytes';\n  const k = 1024;\n  const sizes = ['Bytes', 'KB', 'MB', 'GB'];\n  const i = Math.floor(Math.log(bytes) / Math.log(k));\n  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];\n};
+
 const compressVideo = (req, res) => {
   const startTime = Date.now();
   if (!req.file) {
@@ -554,5 +622,6 @@ module.exports = {
   removeLogo,
   addLogo,
   removeAndAddLogo,
-  convertToReelsFormat
+  convertToReelsFormat,
+  getVideoInfo
 };

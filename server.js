@@ -51,6 +51,7 @@ app.post('/api/video/replace-logo', upload.fields([{ name: 'video' }, { name: 'l
 app.post('/api/video/replace-logo-auto', upload.fields([{ name: 'video' }, { name: 'oldLogo' }, { name: 'newLogo' }]), autoLogoReplacementController.autoReplaceLogoWithDetection);
 app.post('/api/video/to-reels', upload.single('video'), videoController.convertToReelsFormat);
 app.post('/api/video/detect-logo', upload.fields([{ name: 'video' }, { name: 'logo' }]), logoDetectionController.detectLogo);
+app.post('/api/video/info', upload.single('video'), videoController.getVideoInfo);
 
 // Rotas de áudio
 app.post('/api/audio/extract', upload.single('video'), audioController.extractAudio);
