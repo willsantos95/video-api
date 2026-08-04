@@ -78,7 +78,37 @@ const getVideoInfo = (req, res) => {
             codec: audioStream.codec_name,
             sampleRate: audioStream.sample_rate,
             channels: audioStream.channels,
-            bitrate: audioStream.bit_rate\n          } : null,\n          filename: req.file.originalname,\n          executionTime: getExecutionTime(startTime)\n        };\n\n        res.json(info);\n      } catch (parseErr) {\n        res.status(500).json({\n          success: false,\n          error: 'Erro ao processar metadados: ' + parseErr.message,\n          executionTime: getExecutionTime(startTime)\n        });\n      }\n    });\n  } catch (err) {\n    res.status(500).json({\n      success: false,\n      error: err.message,\n      executionTime: getExecutionTime(startTime)\n    });\n  }\n};\n\nconst formatBytes = (bytes) => {\n  if (bytes === 0) return '0 Bytes';\n  const k = 1024;\n  const sizes = ['Bytes', 'KB', 'MB', 'GB'];\n  const i = Math.floor(Math.log(bytes) / Math.log(k));\n  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];\n};
+            bitrate: audioStream.bit_rate
+          } : null,
+          filename: req.file.originalname,
+          executionTime: getExecutionTime(startTime)
+        };
+
+        res.json(info);
+      } catch (parseErr) {
+        res.status(500).json({
+          success: false,
+          error: 'Erro ao processar metadados: ' + parseErr.message,
+          executionTime: getExecutionTime(startTime)
+        });
+      }
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      executionTime: getExecutionTime(startTime)
+    });
+  }
+};
+
+const formatBytes = (bytes) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+};
 
 const compressVideo = (req, res) => {
   const startTime = Date.now();
