@@ -329,8 +329,10 @@ const addLogo = (req, res) => {
   const positionMap = {
     'top-left': `x=${margin}:y=${margin}`,
     'top-right': `x=W-w-${margin}:y=${margin}`,
+    'top-center': `x=(W-w)/2:y=${margin}`,
     'bottom-left': `x=${margin}:y=H-h-${margin}`,
     'bottom-right': `x=W-w-${margin}:y=H-h-${margin}`,
+    'bottom-center': `x=(W-w)/2:y=H-h-${margin}`,
     'center': `x=(W-w)/2:y=(H-h)/2`
   };
 
@@ -524,8 +526,16 @@ const convertToReelsFormat = (req, res) => {
 
   // Adicionar footer se solicitado (combina em um único filtro)
   if (addFooter === true || addFooter === 'true') {
-    const escapedText = footerText.replace(/'/g, "\\'").replace(/:/g, '\\:');
-    filterStr += `,drawbox=y=ih-100:w=iw:h=100:color=${footerBackgroundColor}@${footerBackgroundOpacity}:thickness=fill,drawtext=text='${escapedText}':fontsize=${footerFontSize}:fontcolor=${footerFontColor}:x=(w-text_width)/2:y=h-70:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf`;
+    // Escape special characters for FFmpeg drawtext filter
+    const escapedText = footerText
+      .replace(/\\/g, '\\\\')  // backslash
+      .replace(/'/g, "\\'")    // single quote
+      .replace(/:/g, '\\:')    // colon
+      .replace(/\n/g, ' ');    // newline to space
+
+    // Add padding at bottom + drawtext for footer
+    // First pad video to add space, then add text
+    filterStr += `,pad=w=iw:h=ih+100:x=0:y=0:color=${footerBackgroundColor},drawtext=text='${escapedText}':fontsize=${footerFontSize}:fontcolor=${footerFontColor}:x=(w-text_width)/2:y=h-50`;
   }
 
   ffmpeg(inputPath)
