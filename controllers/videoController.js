@@ -12,104 +12,6 @@ const getExecutionTime = (startTime) => {
   return parseFloat(((Date.now() - startTime) / 1000).toFixed(2));
 };
 
-const getVideoInfo = (req, res) => {
-  const startTime = Date.now();
-
-  if (!req.file) {
-    return res.status(400).json({
-      success: false,
-      error: 'Nenhum arquivo de vídeo enviado'
-    });
-  }
-
-  const videoPath = req.file.path;
-
-  try {
-    ffmpeg.ffprobe(videoPath, (err, metadata) => {
-      if (err) {
-        return res.status(500).json({
-          success: false,
-          error: 'Erro ao ler metadados do vídeo: ' + err.message,
-          executionTime: getExecutionTime(startTime)
-        });
-      }
-
-      try {
-        const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
-        const audioStream = metadata.streams.find(stream => stream.codec_type === 'audio');
-
-        if (!videoStream) {
-          return res.status(400).json({
-            success: false,
-            error: 'Nenhuma stream de vídeo encontrada',
-            executionTime: getExecutionTime(startTime)
-          });
-        }
-
-        const duration = parseFloat(metadata.format.duration || 0);
-        const bitrate = parseInt(metadata.format.bit_rate || 0);
-        const size = fs.statSync(videoPath).size;
-
-        let fps = 24;
-        if (videoStream.r_frame_rate) {
-          const [num, den] = videoStream.r_frame_rate.split('/');
-          fps = Math.round((parseInt(num) / parseInt(den)) * 100) / 100;
-        } else if (videoStream.avg_frame_rate) {
-          const [num, den] = videoStream.avg_frame_rate.split('/');
-          fps = Math.round((parseInt(num) / parseInt(den)) * 100) / 100;
-        }
-
-        const info = {
-          success: true,
-          video: {
-            width: videoStream.width,
-            height: videoStream.height,
-            duration: parseFloat(duration.toFixed(2)),
-            fps: fps,
-            codec: videoStream.codec_name,
-            bitrate: bitrate,
-            format: metadata.format.format_name,
-            size: size,
-            sizeFormatted: formatBytes(size),
-            resolution: `${videoStream.width}x${videoStream.height}`,
-            aspectRatio: videoStream.display_aspect_ratio || 'N/A'
-          },
-          audio: audioStream ? {
-            codec: audioStream.codec_name,
-            sampleRate: audioStream.sample_rate,
-            channels: audioStream.channels,
-            bitrate: audioStream.bit_rate
-          } : null,
-          filename: req.file.originalname,
-          executionTime: getExecutionTime(startTime)
-        };
-
-        res.json(info);
-      } catch (parseErr) {
-        res.status(500).json({
-          success: false,
-          error: 'Erro ao processar metadados: ' + parseErr.message,
-          executionTime: getExecutionTime(startTime)
-        });
-      }
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      error: err.message,
-      executionTime: getExecutionTime(startTime)
-    });
-  }
-};
-
-const formatBytes = (bytes) => {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-};
-
 const compressVideo = (req, res) => {
   const startTime = Date.now();
   if (!req.file) {
@@ -592,8 +494,17 @@ const convertToReelsFormat = (req, res) => {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }
 
-  const { mode = 'crop', backgroundColor = 'black', quality = '28' } = req.body;
-  // mode: 'crop' (corta o vídeo) ou 'pad' (adiciona barras pretas)
+  const {
+    mode = 'crop',
+    backgroundColor = 'black',
+    quality = '28',
+    addFooter = false,
+    footerText = 'ME SEGUE PARA MAIS VIDEOS COMO ESSE',
+    footerFontSize = '48',
+    footerFontColor = 'white',
+    footerBackgroundColor = 'black',
+    footerBackgroundOpacity = '0.8'
+  } = req.body;
 
   const inputPath = req.file.path;
   const outputPath = getOutputPath(inputPath, 'reels-1080x1920');
@@ -604,13 +515,85 @@ const convertToReelsFormat = (req, res) => {
 
   let filterStr;
 
+  // Convertar para Reels format
   if (mode === 'pad') {
-    // Adiciona barras pretas (letterbox/pillarbox) para manter aspect ratio
     filterStr = `scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease,pad=${targetWidth}:${targetHeight}:(ow-iw)/2:(oh-ih)/2:color=${backgroundColor}`;
   } else {
-    // Corta a imagem para 1080x1920 (center crop)
     filterStr = `scale=${targetWidth}:-1,crop=${targetWidth}:${targetHeight}:(in_w-${targetWidth})/2:(in_h-${targetHeight})/2`;
   }
+
+  // Adicionar footer se solicitado (combina em um único filtro)
+  if (addFooter === true || addFooter === 'true') {
+    const escapedText = footerText.replace(/'/g, "\\'").replace(/:/g, '\\:');
+    filterStr += `,drawbox=y=ih-100:w=iw:h=100:color=${footerBackgroundColor}@${footerBackgroundOpacity}:thickness=fill,drawtext=text='${escapedText}':fontsize=${footerFontSize}:fontcolor=${footerFontColor}:x=(w-text_width)/2:y=h-70:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf`;
+  }
+
+  ffmpeg(inputPath)
+    .output(outputPath)
+    .videoFilters(filterStr)
+    .outputOptions([
+      '-c:v', 'libx264',
+      `-crf ${quality}`,
+      '-preset', 'fast',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-pix_fmt', 'yuv420p'
+    ])
+    .on('end', () => {
+      const response = {
+        success: true,
+        message: 'Vídeo convertido para formato Reels/Shorts (1080x1920)',
+        file: path.basename(outputPath),
+        format: '1080x1920',
+        mode: mode,
+        backgroundColor: mode === 'pad' ? backgroundColor : null,
+        executionTime: getExecutionTime(startTime),
+        url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
+      };
+
+      if (addFooter === true || addFooter === 'true') {
+        response.footer = {
+          added: true,
+          text: footerText,
+          fontSize: footerFontSize,
+          fontColor: footerFontColor,
+          backgroundColor: footerBackgroundColor
+        };
+      }
+
+      res.json(response);
+    })
+    .on('error', (err) => {
+      res.status(500).json({ error: err.message });
+    })
+    .run();
+};
+
+const addFooterText = (req, res) => {
+  const startTime = Date.now();
+  if (!req.file) {
+    return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+  }
+
+  const {
+    text = 'ME SEGUE PARA MAIS VIDEOS COMO ESSE',
+    fontSize = '48',
+    fontColor = 'white',
+    backgroundColor = 'black',
+    backgroundOpacity = '0.8',
+    padding = '20',
+    quality = '28'
+  } = req.body;
+
+  const inputPath = req.file.path;
+  const outputPath = getOutputPath(inputPath, 'with-footer');
+
+  // Escape text for FFmpeg drawtext filter
+  const escapedText = text.replace(/'/g, "\\'").replace(/:/g, '\\:');
+
+  // Filter: Add black background box + white text in footer
+  // Text is centered horizontally and positioned at bottom
+  const filterStr = `drawbox=y=ih-100:w=iw:h=100:color=black@${backgroundOpacity}:thickness=fill,drawtext=text='${escapedText}':fontsize=${fontSize}:fontcolor=${fontColor}:x=(w-text_width)/2:y=h-70:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf`;
 
   ffmpeg(inputPath)
     .output(outputPath)
@@ -626,11 +609,12 @@ const convertToReelsFormat = (req, res) => {
     .on('end', () => {
       res.json({
         success: true,
-        message: 'Vídeo convertido para formato Reels/Shorts (1080x1920)',
+        message: 'Footer adicionado com sucesso',
         file: path.basename(outputPath),
-        format: '1080x1920',
-        mode: mode,
-        backgroundColor: mode === 'pad' ? backgroundColor : null,
+        text: text,
+        fontSize: fontSize,
+        fontColor: fontColor,
+        backgroundColor: backgroundColor,
         executionTime: getExecutionTime(startTime),
         url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
       });
@@ -653,5 +637,5 @@ module.exports = {
   addLogo,
   removeAndAddLogo,
   convertToReelsFormat,
-  getVideoInfo
+  addFooterText
 };
