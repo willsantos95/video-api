@@ -49,6 +49,7 @@ app.post('/api/video/add-logo', upload.fields([{ name: 'video' }, { name: 'logo'
 app.post('/api/video/replace-logo', upload.fields([{ name: 'video' }, { name: 'logo' }]), videoController.removeAndAddLogo);
 app.post('/api/video/to-reels', upload.single('video'), videoController.convertToReelsFormat);
 app.post('/api/video/add-footer', upload.single('video'), videoController.addFooterText);
+app.post('/api/video/info', upload.single('video'), videoController.getVideoInfo);
 app.post('/api/video/detect-logo', upload.fields([{ name: 'video' }, { name: 'logo' }]), logoDetectionController.detectLogo);
 
 // Rotas de áudio

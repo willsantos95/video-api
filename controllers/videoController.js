@@ -635,6 +635,71 @@ const addFooterText = (req, res) => {
     .run();
 };
 
+const getVideoInfo = (req, res) => {
+  const startTime = Date.now();
+  if (!req.file) {
+    return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+  }
+
+  const inputPath = req.file.path;
+  const fileSize = fs.statSync(inputPath).size;
+
+  ffmpeg.ffprobe(inputPath, (err, metadata) => {
+    if (err) {
+      return res.status(500).json({ error: 'Erro ao obter informações do vídeo: ' + err.message });
+    }
+
+    const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+    const audioStream = metadata.streams.find(s => s.codec_type === 'audio');
+
+    // Calcular aspect ratio
+    let aspectRatio = '16:9';
+    if (videoStream) {
+      const w = videoStream.width;
+      const h = videoStream.height;
+      const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+      const divisor = gcd(w, h);
+      aspectRatio = `${w / divisor}:${h / divisor}`;
+    }
+
+    // Formatar tamanho
+    const formatSize = (bytes) => {
+      const mb = (bytes / (1024 * 1024)).toFixed(2);
+      return `${mb} MB`;
+    };
+
+    const fps = videoStream && videoStream.r_frame_rate ?
+      Math.round(parseInt(videoStream.r_frame_rate.split('/')[0]) / parseInt(videoStream.r_frame_rate.split('/')[1])) : 0;
+
+    const response = {
+      success: true,
+      video: {
+        width: videoStream ? videoStream.width : 0,
+        height: videoStream ? videoStream.height : 0,
+        duration: metadata.format.duration ? parseFloat(metadata.format.duration.toFixed(2)) : 0,
+        fps: fps,
+        codec: videoStream ? videoStream.codec_name : 'unknown',
+        bitrate: videoStream && videoStream.bit_rate ? parseInt(videoStream.bit_rate) : 0,
+        format: metadata.format.format_name || 'unknown',
+        size: fileSize,
+        sizeFormatted: formatSize(fileSize),
+        resolution: videoStream ? `${videoStream.width}x${videoStream.height}` : 'unknown',
+        aspectRatio: aspectRatio
+      },
+      audio: audioStream ? {
+        codec: audioStream.codec_name,
+        sampleRate: audioStream.sample_rate,
+        channels: audioStream.channels,
+        bitrate: audioStream.bit_rate ? parseInt(audioStream.bit_rate) : 0
+      } : null,
+      filename: req.file.originalname,
+      executionTime: getExecutionTime(startTime)
+    };
+
+    res.json(response);
+  });
+};
+
 module.exports = {
   compressVideo,
   convertFormat,
@@ -647,5 +712,6 @@ module.exports = {
   addLogo,
   removeAndAddLogo,
   convertToReelsFormat,
-  addFooterText
+  addFooterText,
+  getVideoInfo
 };
