@@ -344,12 +344,13 @@ const addLogo = (req, res) => {
   }
 
   const scaleFactor = parseFloat(scale);
+  const opacityValue = parseFloat(opacity);
 
   ffmpeg(videoPath)
     .input(logoPath)
     .output(outputPath)
-    .complexFilter(`[1:v]scale=iw*${scaleFactor}:ih*${scaleFactor}[logo];[0:v][logo]overlay=${overlayPosition}`)
-    .outputOptions(['-c:a aac', '-b:a 128k', '-c:v libx264', '-pix_fmt yuv420p'])
+    .complexFilter(`[1:v]scale=iw*${scaleFactor}:ih*${scaleFactor},format=rgba[logo];[0:v][logo]overlay=${overlayPosition}:format=auto`)
+    .outputOptions(['-c:a aac', '-b:a 128k', '-c:v libx264', '-pix_fmt yuv420p', '-y'])
     .on('end', () => {
       const response = {
         success: true,
@@ -414,8 +415,10 @@ const removeAndAddLogo = (req, res) => {
   // Position presets to keep logo visible
   const positionPresets = {
     'top-left': { x: '20', y: '20' },
+    'top-center': { x: '(W-w)/2', y: '20' },
     'top-right': { x: 'W-w-20', y: '20' },
     'bottom-left': { x: '20', y: 'H-h-20' },
+    'bottom-center': { x: '(W-w)/2', y: 'H-h-20' },
     'bottom-right': { x: 'W-w-20', y: 'H-h-20' },
     'center': { x: '(W-w)/2', y: '(H-h)/2' }
   };
@@ -435,9 +438,9 @@ const removeAndAddLogo = (req, res) => {
     overlayY = parseInt(newLogoY) + parseInt(logoOffsetY);
   }
 
-  // Build filter chain: drawbox to cover old logo + overlay new logo
+  // Build filter chain: drawbox to cover old logo + overlay new logo with transparency
   // drawbox: draw filled rectangle at old logo position with specified color
-  const complexFilterStr = `[0]drawbox=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}:color=${removalColor}:thickness=fill[covered];[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[covered][logo]overlay=x=${overlayX}:y=${overlayY}[out]`;
+  const complexFilterStr = `[0]drawbox=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}:color=${removalColor}:thickness=fill[covered];[1:v]scale=iw*${logoScale}:ih*${logoScale},format=rgba[logo];[covered][logo]overlay=x=${overlayX}:y=${overlayY}:format=auto[out]`;
 
   ffmpeg(videoPath)
     .input(logoPath)
