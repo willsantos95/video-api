@@ -349,8 +349,8 @@ const addLogo = (req, res) => {
   ffmpeg(videoPath)
     .input(logoPath)
     .output(outputPath)
-    .complexFilter(`[1:v]scale=iw*${scaleFactor}:ih*${scaleFactor}[logo];[0:v][logo]overlay=${overlayPosition}`)
-    .outputOptions(['-c:a aac', '-b:a 128k', '-c:v libx264', '-pix_fmt yuv420p', '-y'])
+    .complexFilter(`[1:v]scale=iw*${scaleFactor}:ih*${scaleFactor},format=rgba[logo];[0:v][logo]overlay=${overlayPosition}:shortest=1`)
+    .outputOptions(['-c:v libx264', '-pix_fmt yuv420p', '-c:a aac', '-b:a 128k', '-y'])
     .on('end', () => {
       const response = {
         success: true,
@@ -440,7 +440,7 @@ const removeAndAddLogo = (req, res) => {
 
   // Build filter chain: drawbox to cover old logo + overlay new logo with proper alpha blending
   // drawbox: draw filled rectangle at old logo position with specified color
-  const complexFilterStr = `[0]drawbox=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}:color=${removalColor}:thickness=fill[covered];[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[covered][logo]overlay=x=${overlayX}:y=${overlayY}[out]`;
+  const complexFilterStr = `[0]drawbox=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}:color=${removalColor}:thickness=fill[covered];[1:v]scale=iw*${logoScale}:ih*${logoScale},format=rgba[logo];[covered][logo]overlay=x=${overlayX}:y=${overlayY}:shortest=1[out]`;
 
   ffmpeg(videoPath)
     .input(logoPath)
