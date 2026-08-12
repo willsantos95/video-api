@@ -345,6 +345,7 @@ const addLogo = (req, res) => {
 
   const scaleFactor = parseFloat(scale);
   const opacityValue = parseFloat(opacity);
+  const thumbnailPath = path.join(path.dirname(outputPath), `thumb_${Date.now()}.jpg`);
 
   ffmpeg(videoPath)
     .input(logoPath)
@@ -352,26 +353,70 @@ const addLogo = (req, res) => {
     .complexFilter(`[1:v]scale=iw*${scaleFactor}:ih*${scaleFactor}[scaled];[0:v][scaled]overlay=${overlayPosition}`)
     .outputOptions(['-c:v libx264', '-pix_fmt yuv420p', '-c:a aac', '-b:a 128k'])
     .on('end', () => {
-      const response = {
-        success: true,
-        message: 'Logo adicionado com sucesso',
-        file: path.basename(outputPath),
-        scale: scale,
-        opacity: opacity,
-        executionTime: getExecutionTime(startTime),
-        url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(outputPath)}`
-      };
+      // Extrair thumbnail em 2 segundos
+      ffmpeg(outputPath)
+        .screenshot({
+          timestamps: ['2'],
+          filename: path.basename(thumbnailPath),
+          folder: path.dirname(thumbnailPath),
+          size: '1920x1080'
+        })
+        .on('end', () => {
+          // Adicionar thumbnail como capa do vídeo
+          const finalOutputPath = path.join(path.dirname(outputPath), `with_logo_cover_${Date.now()}.mp4`);
 
-      if (x !== null && y !== null) {
-        response.positioning = 'custom';
-        response.x = x;
-        response.y = y;
-      } else {
-        response.positioning = 'preset';
-        response.position = position;
-      }
+          ffmpeg()
+            .input(outputPath)
+            .input(thumbnailPath)
+            .output(finalOutputPath)
+            .outputOptions([
+              '-c:v', 'copy',
+              '-c:a', 'copy',
+              '-map', '0',
+              '-map', '1',
+              '-c:v:1', 'mjpeg',
+              '-disposition:v:1', 'attached_pic'
+            ])
+            .on('end', () => {
+              // Limpar thumbnail temporário
+              if (fs.existsSync(thumbnailPath)) {
+                fs.unlinkSync(thumbnailPath);
+              }
+              // Remover vídeo sem capa
+              if (fs.existsSync(outputPath)) {
+                fs.unlinkSync(outputPath);
+              }
 
-      res.json(response);
+              const response = {
+                success: true,
+                message: 'Logo adicionado com sucesso + capa atualizada',
+                file: path.basename(finalOutputPath),
+                scale: scale,
+                opacity: opacity,
+                thumbnail: 'Frame de 2 segundos',
+                executionTime: getExecutionTime(startTime),
+                url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(finalOutputPath)}`
+              };
+
+              if (x !== null && y !== null) {
+                response.positioning = 'custom';
+                response.x = x;
+                response.y = y;
+              } else {
+                response.positioning = 'preset';
+                response.position = position;
+              }
+
+              res.json(response);
+            })
+            .on('error', (err) => {
+              res.status(500).json({ error: 'Erro ao adicionar capa: ' + err.message });
+            })
+            .run();
+        })
+        .on('error', (err) => {
+          res.status(500).json({ error: 'Erro ao extrair thumbnail: ' + err.message });
+        });
     })
     .on('error', (err) => {
       res.status(500).json({ error: err.message });
@@ -442,6 +487,8 @@ const removeAndAddLogo = (req, res) => {
   // drawbox: draw filled rectangle at old logo position with specified color
   const complexFilterStr = `[0]drawbox=x=${logoX}:y=${logoY}:w=${logoWidth}:h=${logoHeight}:color=${removalColor}:thickness=fill[covered];[1:v]scale=iw*${logoScale}:ih*${logoScale}[logo];[covered][logo]overlay=x=${overlayX}:y=${overlayY}`;
 
+  const thumbnailPath = path.join(path.dirname(finalOutputPath), `thumb_${Date.now()}.jpg`);
+
   ffmpeg(videoPath)
     .input(logoPath)
     .output(finalOutputPath)
@@ -455,35 +502,72 @@ const removeAndAddLogo = (req, res) => {
       '-pix_fmt', 'yuv420p'
     ])
     .on('end', () => {
-      res.json({
-        success: true,
-        message: 'Logo removido e novo logo adicionado com sucesso',
-        file: path.basename(finalOutputPath),
-        oldLogoRemoval: {
-          method: 'drawbox (cobertura com cor sólida)',
-          color: removalColor,
-          x: logoX,
-          y: logoY,
-          width: logoWidth,
-          height: logoHeight
-        },
-        newLogoAdded: {
-          x: overlayX,
-          y: overlayY,
-          scale: logoScale,
-          centered: shouldCenter,
-          positionMode: positionPreset ? 'preset' : (shouldCenter ? 'old-logo-position' : 'custom'),
-          offset: { x: logoOffsetX, y: logoOffsetY }
-        },
-        tips: {
-          note: 'Se a cor de cobertura não combinar:',
-          option1: 'Trocar removalColor: "black", "white", "0x00FF00" (verde), etc',
-          option2: 'Aumentar logoScale para cobrir melhor a área',
-          option3: 'Usar positionPreset: "top-right", "bottom-right", "center"'
-        },
-        executionTime: getExecutionTime(startTime),
-        url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(finalOutputPath)}`
-      });
+      // Extrair thumbnail em 2 segundos
+      ffmpeg(finalOutputPath)
+        .screenshot({
+          timestamps: ['2'],
+          filename: path.basename(thumbnailPath),
+          folder: path.dirname(thumbnailPath),
+          size: '1920x1080'
+        })
+        .on('end', () => {
+          // Adicionar thumbnail como capa do vídeo
+          const finalOutputWithCoverPath = path.join(path.dirname(finalOutputPath), `replaced_logo_cover_${Date.now()}.mp4`);
+
+          ffmpeg()
+            .input(finalOutputPath)
+            .input(thumbnailPath)
+            .output(finalOutputWithCoverPath)
+            .outputOptions([
+              '-c:v', 'copy',
+              '-c:a', 'copy',
+              '-map', '0',
+              '-map', '1',
+              '-c:v:1', 'mjpeg',
+              '-disposition:v:1', 'attached_pic'
+            ])
+            .on('end', () => {
+              // Limpar arquivo temporário
+              if (fs.existsSync(thumbnailPath)) {
+                fs.unlinkSync(thumbnailPath);
+              }
+              if (fs.existsSync(finalOutputPath)) {
+                fs.unlinkSync(finalOutputPath);
+              }
+
+              res.json({
+                success: true,
+                message: 'Logo removido, novo logo adicionado + capa atualizada',
+                file: path.basename(finalOutputWithCoverPath),
+                thumbnail: 'Frame de 2 segundos',
+                oldLogoRemoval: {
+                  method: 'drawbox (cobertura com cor sólida)',
+                  color: removalColor,
+                  x: logoX,
+                  y: logoY,
+                  width: logoWidth,
+                  height: logoHeight
+                },
+                newLogoAdded: {
+                  x: overlayX,
+                  y: overlayY,
+                  scale: logoScale,
+                  centered: shouldCenter,
+                  positionMode: positionPreset ? 'preset' : (shouldCenter ? 'old-logo-position' : 'custom'),
+                  offset: { x: logoOffsetX, y: logoOffsetY }
+                },
+                executionTime: getExecutionTime(startTime),
+                url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(finalOutputWithCoverPath)}`
+              });
+            })
+            .on('error', (err) => {
+              res.status(500).json({ error: 'Erro ao adicionar capa: ' + err.message });
+            })
+            .run();
+        })
+        .on('error', (err) => {
+          res.status(500).json({ error: 'Erro ao extrair thumbnail: ' + err.message });
+        });
     })
     .on('error', (err) => {
       res.status(500).json({ error: err.message });
