@@ -121,7 +121,7 @@ function montarFiltro({ largura, altura, titulo, subtitulo, prefixoTmp, fundo = 
   } else {
     partes.push(`[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1[v1]`);
   }
-  partes.push(`[v1][1:v]overlay=0:0[v2]`);
+  partes.push(`[v1][1:v]overlay=0:0:shortest=1[v2]`);
 
   const t = montarTitulo(titulo);
   const arquivosTexto = [];
