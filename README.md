@@ -13,7 +13,35 @@ API completa para edição de vídeos, criação de áudios e legendas com FFmpe
 - ✅ Extração de miniaturas (thumbnail)
 - ✅ Unificação de múltiplos vídeos
 
-### 🎵 Processamento de Áudio
+#---
+
+## 🎬 Moldura Recorte de Cinema
+
+Aplica a identidade visual do Recorte de Cinema e entrega o vídeo pronto para Reels (1080x1920, 30 fps).
+
+```bash
+POST /api/video/recorte-template
+Content-Type: multipart/form-data   (ou application/json com videoUrl)
+
+video: [arquivo.mp4]            # ou videoUrl: "https://..."
+titulo: "Clube da Luta"          # obrigatório — vira caixa alta, 1 ou 2 linhas, tamanho automático
+subtitulo: "(1999) · Drama"      # opcional — em dourado, abaixo do título
+fundo: "blur"                    # blur (padrão) ou preto — só para vídeo deitado
+quality: 23                      # CRF 16–35 (menor = melhor)
+```
+
+- **Vídeo deitado ou quadrado:** fica inteiro no centro, com o próprio vídeo desfocado no fundo.
+- **Vídeo em pé:** ocupa a tela toda.
+- Por cima vai `assets/recorte/moldura.png` (selo, cantos, degradês e "Siga @recorte.de.cinema").
+- Fontes em `assets/fonts` (SIL OFL).
+
+**Resposta:**
+```json
+{ "success": true, "file": "..._recorte.mp4", "url": "https://.../download/..._recorte.mp4",
+  "layout": "video-centralizado-com-fundo", "titulo": { "linhas": ["CLUBE DA LUTA"], "tamanho": 120 } }
+```
+
+## 🎵 Processamento de Áudio
 - ✅ Extração de áudio de vídeos
 - ✅ Adição de áudio em vídeos
 - ✅ Síntese de fala (text-to-audio)

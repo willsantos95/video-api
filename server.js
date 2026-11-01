@@ -31,6 +31,7 @@ const audioController = require('./controllers/audioController');
 const subtitleController = require('./controllers/subtitleController');
 const instagramController = require('./controllers/instagramController');
 const logoDetectionController = require('./controllers/logoDetectionController');
+const templateController = require('./controllers/templateController');
 
 app.get('/health', (req, res) => {
   res.json({ status: 'API rodando', timestamp: new Date() });
@@ -50,6 +51,8 @@ app.post('/api/video/replace-logo', upload.fields([{ name: 'video' }, { name: 'l
 app.post('/api/video/to-reels', upload.single('video'), videoController.convertToReelsFormat);
 app.post('/api/video/add-footer', upload.single('video'), videoController.addFooterText);
 app.post('/api/video/info', upload.single('video'), videoController.getVideoInfo);
+// Moldura da identidade Recorte de Cinema (Reels 1080x1920 com título)
+app.post('/api/video/recorte-template', upload.single('video'), templateController.recorteTemplate);
 app.post('/api/video/detect-logo', upload.fields([{ name: 'video' }, { name: 'logo' }]), logoDetectionController.detectLogo);
 
 // Rotas de áudio
