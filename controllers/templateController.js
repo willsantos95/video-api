@@ -1,11 +1,13 @@
-// Moldura da identidade "Recorte de Cinema" aplicada a um vídeo (Reels 1080x1920).
+// Molduras das páginas aplicadas a um vídeo (Reels 1080x1920).
+//
+// Temas: recorte (Recorte de Cinema), animacao (Momento da Animação), comedia (Comédia Controversa).
 //
 // Composição:
 //   - vídeo deitado/quadrado: fundo com o próprio vídeo desfocado + vídeo inteiro no centro
-//   - vídeo em pé: preenche a tela (corta as sobras)
-//   - por cima: assets/recorte/moldura.png (degradês, selo, cantos e rodapé)
-//   - título (Bebas Neue) e subtítulo (Playfair Italic) escritos com drawtext,
-//     com quebra de linha e tamanho automáticos
+//   - vídeo em pé com a cena deitada no meio: recorta a cena e segue como deitado
+//   - vídeo em pé de verdade: preenche a tela (corta as sobras)
+//   - por cima: assets/<tema>/moldura.png (degradês, selo, enfeites e rodapé)
+//   - título e subtítulo escritos com drawtext, com quebra de linha e tamanho automáticos
 
 const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
@@ -15,27 +17,53 @@ const opentype = require('opentype.js');
 const { spawn } = require('child_process');
 
 const ASSETS = path.join(__dirname, '..', 'assets');
-const FONTES = {
-  titulo: path.join(ASSETS, 'fonts', 'BebasNeue-Regular.ttf'),
-  subtitulo: path.join(ASSETS, 'fonts', 'PlayfairDisplay-BoldItalic.ttf'),
+const fonteArq = (nome) => path.join(ASSETS, 'fonts', nome);
+
+// Cada tema: arquivo da moldura, posição do título e estilo do título/subtítulo.
+// Cores no formato do ffmpeg (0xRRGGBB). borda/sombra opcionais.
+const TEMAS = {
+  recorte: {
+    moldura: path.join(ASSETS, 'recorte', 'moldura.png'),
+    topo: 250,
+    titulo: { fonte: fonteArq('BebasNeue-Regular.ttf'), cor: '0xF5EFE6', max: 120, min: 72, caixaAlta: true, alturaLinha: 0.95 },
+    subtitulo: { fonte: fonteArq('PlayfairDisplay-BoldItalic.ttf'), cor: '0xF4B942', tamanho: 50, espaco: 12 },
+  },
+  animacao: {
+    moldura: path.join(ASSETS, 'animacao', 'moldura.png'),
+    topo: 225,
+    titulo: { fonte: fonteArq('Fredoka-Bold.ttf'), cor: '0xFFF4E0', max: 104, min: 64, caixaAlta: false, alturaLinha: 1.08,
+      borda: { largura: 7, cor: '0x1E2A5A' }, sombra: { cor: '0xFF7A3D', x: 0, y: 7 } },
+    subtitulo: { fonte: fonteArq('Nunito-Black.ttf'), cor: '0xFFC93C', tamanho: 46, espaco: 18, borda: { largura: 5, cor: '0x1E2A5A' } },
+  },
+  comedia: {
+    moldura: path.join(ASSETS, 'comedia', 'moldura.png'),
+    topo: 225,
+    titulo: { fonte: fonteArq('Bangers-Regular.ttf'), cor: '0xFFD400', max: 124, min: 76, caixaAlta: true, alturaLinha: 1.2,
+      borda: { largura: 7, cor: '0x111111' }, sombra: { cor: '0xFF2E2E', x: 7, y: 7 } },
+    subtitulo: { fonte: fonteArq('Inter-ExtraBold.ttf'), cor: '0xFFFFFF', tamanho: 44, espaco: 30, borda: { largura: 4, cor: '0x111111' } },
+  },
 };
-const MOLDURA = path.join(ASSETS, 'recorte', 'moldura.png');
+const ALIAS_TEMA = { 'recorte-de-cinema': 'recorte', cinema: 'recorte', 'momento-da-animacao': 'animacao', anima: 'animacao', 'comedia-controversa': 'comedia' };
+function pegarTema(nome) {
+  const n = String(nome || 'recorte').toLowerCase().trim();
+  return TEMAS[ALIAS_TEMA[n] || n] ? { nome: ALIAS_TEMA[n] || n, ...TEMAS[ALIAS_TEMA[n] || n] } : null;
+}
 
 const W = 1080;
 const H = 1920;
 const MARGEM_X = 60;
 const LARGURA_TEXTO = W - MARGEM_X * 2;
-const TOPO_TITULO = 250;
 const AREA_VIDEO_ALTURA = 1100; // caixa central para vídeo deitado
 
+// "nome" aqui é o caminho do arquivo da fonte
 const fonteCache = {};
-function fonte(nome) {
-  if (!fonteCache[nome]) fonteCache[nome] = opentype.loadSync(FONTES[nome]);
-  return fonteCache[nome];
+function fonte(arquivo) {
+  if (!fonteCache[arquivo]) fonteCache[arquivo] = opentype.loadSync(arquivo);
+  return fonteCache[arquivo];
 }
 
-function larguraTexto(nome, texto, tamanho) {
-  return fonte(nome).getAdvanceWidth(texto, tamanho);
+function larguraTexto(arquivo, texto, tamanho) {
+  return fonte(arquivo).getAdvanceWidth(texto, tamanho);
 }
 
 /** Quebra o texto em linhas que caibam na largura. */
@@ -60,16 +88,18 @@ function encurtar(nome, texto, tamanho, largura) {
   return `${t.trim()}…`;
 }
 
-/** Escolhe o maior tamanho (120 → 72) em que o título cabe em até 2 linhas. */
-function montarTitulo(texto) {
-  const t = String(texto || '').replace(/\s+/g, ' ').trim().toUpperCase();
-  for (let tam = 120; tam >= 72; tam -= 4) {
-    const linhas = quebrar('titulo', t, tam, LARGURA_TEXTO);
+/** Escolhe o maior tamanho (max → min) em que o título cabe em até 2 linhas. */
+function montarTitulo(texto, estilo = TEMAS.recorte.titulo) {
+  let t = String(texto || '').replace(/\s+/g, ' ').trim();
+  if (estilo.caixaAlta) t = t.toUpperCase();
+  const largura = LARGURA_TEXTO - (estilo.borda ? estilo.borda.largura * 2 : 0) - (estilo.sombra ? Math.abs(estilo.sombra.x) : 0);
+  for (let tam = estilo.max; tam >= estilo.min; tam -= 4) {
+    const linhas = quebrar(estilo.fonte, t, tam, largura);
     if (linhas.length <= 2) return { tamanho: tam, linhas };
   }
-  const linhas = quebrar('titulo', t, 72, LARGURA_TEXTO);
-  const segunda = encurtar('titulo', linhas.slice(1).join(' '), 72, LARGURA_TEXTO);
-  return { tamanho: 72, linhas: [linhas[0], segunda] };
+  const linhas = quebrar(estilo.fonte, t, estilo.min, largura);
+  const segunda = encurtar(estilo.fonte, linhas.slice(1).join(' '), estilo.min, largura);
+  return { tamanho: estilo.min, linhas: [linhas[0], segunda] };
 }
 
 function sondar(arquivo) {
@@ -204,15 +234,21 @@ async function detectarCena(arquivo, info) {
   }
 }
 
-const drawtext = (fonteArquivo, textfile, tamanho, cor, y) =>
-  `drawtext=fontfile='${fonteArquivo}':textfile='${textfile}':expansion=none:fontsize=${tamanho}:fontcolor=${cor}` +
-  `:x=${MARGEM_X}:y=${y}:shadowcolor=black@0.55:shadowx=0:shadowy=4`;
+function drawtext(estilo, textfile, tamanho, y) {
+  const borda = estilo.borda ? `:borderw=${estilo.borda.largura}:bordercolor=${estilo.borda.cor}` : '';
+  const sombra = estilo.sombra
+    ? `:shadowcolor=${estilo.sombra.cor}:shadowx=${estilo.sombra.x}:shadowy=${estilo.sombra.y}`
+    : ':shadowcolor=black@0.55:shadowx=0:shadowy=4';
+  const x = MARGEM_X + (estilo.borda ? estilo.borda.largura : 0);
+  return `drawtext=fontfile='${estilo.fonte}':textfile='${textfile}':expansion=none:fontsize=${tamanho}:fontcolor=${estilo.cor}` +
+    `:x=${x}:y=${y}${borda}${sombra}`;
+}
 
 /**
  * Monta o filtro do ffmpeg. Exportado para teste.
  * @returns {{ filtro: string, arquivosTexto: {caminho:string, texto:string}[], titulo: object }}
  */
-function montarFiltro({ largura, altura, titulo, subtitulo, prefixoTmp, fundo = 'blur', cena = null }) {
+function montarFiltro({ largura, altura, titulo, subtitulo, prefixoTmp, fundo = 'blur', cena = null, tema = pegarTema('recorte') }) {
   const deitado = !!cena || largura / altura > 0.75; // tudo que não é praticamente vertical
   const partes = [];
   // cena embutida num vídeo em pé: recorta só ela e segue como vídeo deitado
@@ -230,20 +266,22 @@ function montarFiltro({ largura, altura, titulo, subtitulo, prefixoTmp, fundo = 
   }
   partes.push(`[v1][1:v]overlay=0:0:shortest=1[v2]`);
 
-  const t = montarTitulo(titulo);
+  const t = montarTitulo(titulo, tema.titulo);
   const arquivosTexto = [];
   const textos = [];
-  const altLinha = Math.round(t.tamanho * 0.95);
+  const altLinha = Math.round(t.tamanho * tema.titulo.alturaLinha);
   t.linhas.forEach((linha, i) => {
     const caminho = `${prefixoTmp}_t${i}.txt`;
     arquivosTexto.push({ caminho, texto: linha });
-    textos.push(drawtext(FONTES.titulo, caminho, t.tamanho, '0xF5EFE6', TOPO_TITULO + i * altLinha));
+    textos.push(drawtext(tema.titulo, caminho, t.tamanho, tema.topo + i * altLinha));
   });
   const sub = String(subtitulo || '').replace(/\s+/g, ' ').trim();
   if (sub) {
+    const st = tema.subtitulo;
     const caminho = `${prefixoTmp}_s.txt`;
-    arquivosTexto.push({ caminho, texto: encurtar('subtitulo', sub, 50, LARGURA_TEXTO) });
-    textos.push(drawtext(FONTES.subtitulo, caminho, 50, '0xF4B942', TOPO_TITULO + t.linhas.length * altLinha + 12));
+    const larguraSub = LARGURA_TEXTO - (st.borda ? st.borda.largura * 2 : 0);
+    arquivosTexto.push({ caminho, texto: encurtar(st.fonte, sub, st.tamanho, larguraSub) });
+    textos.push(drawtext(st, caminho, st.tamanho, tema.topo + t.linhas.length * altLinha + st.espaco));
   }
   partes.push(`[v2]${textos.join(',')},fps=30,format=yuv420p[out]`);
   return { filtro: partes.join(';'), arquivosTexto, titulo: t, deitado };
@@ -255,6 +293,8 @@ const recorteTemplate = async (req, res) => {
   try {
     const { titulo, subtitulo = '', videoUrl, quality = '23', fundo = 'blur' } = req.body || {};
     if (!titulo || !String(titulo).trim()) return res.status(400).json({ error: 'Informe o titulo' });
+    const tema = pegarTema(req.body?.tema || req.params?.tema);
+    if (!tema) return res.status(400).json({ error: `Tema inválido. Use: ${Object.keys(TEMAS).join(', ')}` });
 
     let entrada = req.file?.path;
     if (!entrada) {
@@ -269,7 +309,7 @@ const recorteTemplate = async (req, res) => {
     const prefixoTmp = path.join(path.dirname(entrada), `${path.basename(entrada, path.extname(entrada))}_txt`);
     const cena = String(req.body?.detectarCena ?? 'true') === 'false' ? null : await detectarCena(entrada, info);
     const { filtro, arquivosTexto, titulo: t, deitado } = montarFiltro({
-      largura: info.largura, altura: info.altura, titulo, subtitulo, prefixoTmp, fundo, cena,
+      largura: info.largura, altura: info.altura, titulo, subtitulo, prefixoTmp, fundo, cena, tema,
     });
     for (const a of arquivosTexto) { fs.writeFileSync(a.caminho, a.texto, 'utf8'); temporarios.push(a.caminho); }
 
@@ -280,7 +320,7 @@ const recorteTemplate = async (req, res) => {
 
     await new Promise((ok, falha) => {
       ffmpeg(entrada)
-        .input(MOLDURA).inputOptions(['-loop', '1'])
+        .input(tema.moldura).inputOptions(['-loop', '1'])
         .complexFilter(filtro)
         .outputOptions([...opcoes, '-shortest'])
         .output(saida)
@@ -291,7 +331,8 @@ const recorteTemplate = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Moldura Recorte de Cinema aplicada',
+      message: `Moldura aplicada (tema ${tema.nome})`,
+      tema: tema.nome,
       file: path.basename(saida),
       url: `${(process.env.API_URL || 'http://localhost:3000').replace(/\/+$/, '')}/download/${path.basename(saida)}`,
       layout: cena ? 'cena-recortada-com-fundo' : deitado ? 'video-centralizado-com-fundo' : 'tela-cheia',
@@ -308,4 +349,4 @@ const recorteTemplate = async (req, res) => {
   }
 };
 
-module.exports = { recorteTemplate, montarFiltro, montarTitulo, analisarMovimento, detectarCena };
+module.exports = { recorteTemplate, montarFiltro, montarTitulo, analisarMovimento, detectarCena, TEMAS, pegarTema };
