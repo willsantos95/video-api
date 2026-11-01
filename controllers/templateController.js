@@ -12,6 +12,7 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const opentype = require('opentype.js');
+const { spawn } = require('child_process');
 
 const ASSETS = path.join(__dirname, '..', 'assets');
 const FONTES = {
@@ -100,6 +101,109 @@ async function baixar(url, destino) {
   return destino;
 }
 
+
+// ── Cena embutida ─────────────────────────────────────────────────────────
+// Muitos vídeos de origem já vêm "em pé", com a cena deitada no meio e faixas
+// paradas em cima/embaixo (às vezes com legenda gravada). Para achar a cena,
+// comparamos alguns quadros espalhados pelo vídeo: as linhas/colunas que mudam
+// são a cena; o que fica parado (faixas, legenda, marca d'água) fica de fora.
+
+const AMOSTRA_LARGURA = 96;
+const AMOSTRA_QUADROS = 16;
+
+function lerQuadrosCinza(arquivo, duracao, larg, alt) {
+  return new Promise((ok, falha) => {
+    const fps = Math.max(0.05, AMOSTRA_QUADROS / Math.max(1, duracao));
+    const args = ['-v', 'error', '-i', arquivo, '-an',
+      '-vf', `fps=${fps.toFixed(4)},scale=${larg}:${alt}:flags=area,format=gray`,
+      '-frames:v', String(AMOSTRA_QUADROS + 1), '-f', 'rawvideo', 'pipe:1'];
+    const p = spawn('ffmpeg', args);
+    const partes = [];
+    let erro = '';
+    p.stdout.on('data', (d) => partes.push(d));
+    p.stderr.on('data', (d) => { erro += d; });
+    p.on('error', falha);
+    p.on('close', (code) => {
+      if (code !== 0) return falha(new Error(`ffmpeg (amostra) saiu com ${code}: ${erro.slice(-300)}`));
+      const buf = Buffer.concat(partes);
+      const tam = larg * alt;
+      const quadros = [];
+      for (let i = 0; i + tam <= buf.length; i += tam) quadros.push(buf.subarray(i, i + tam));
+      ok(quadros);
+    });
+  });
+}
+
+/** Maior faixa contínua acima do limite (tolera buracos de até `folga` posições). */
+function maiorFaixa(valores, limite, folga = 2) {
+  let melhor = null, ini = -1, ultimo = -1;
+  const fechar = () => {
+    if (ini >= 0 && (!melhor || ultimo - ini > melhor.fim - melhor.ini)) melhor = { ini, fim: ultimo };
+  };
+  valores.forEach((v, i) => {
+    if (v >= limite) {
+      if (ini < 0 || i - ultimo > folga + 1) { fechar(); ini = i; }
+      ultimo = i;
+    }
+  });
+  fechar();
+  return melhor;
+}
+
+/** Puro (sem ffmpeg) — exportado para teste. Devolve o recorte da cena em fração (0–1) ou null. */
+function analisarMovimento(quadros, larg, alt) {
+  if (quadros.length < 3) return null;
+  const linhas = new Float64Array(alt), colunas = new Float64Array(larg);
+  for (let q = 1; q < quadros.length; q++) {
+    const a = quadros[q - 1], b = quadros[q];
+    for (let y = 0; y < alt; y++) {
+      for (let x = 0; x < larg; x++) {
+        const d = Math.abs(a[y * larg + x] - b[y * larg + x]);
+        linhas[y] += d; colunas[x] += d;
+      }
+    }
+  }
+  const n = quadros.length - 1;
+  for (let y = 0; y < alt; y++) linhas[y] /= n * larg;
+  for (let x = 0; x < larg; x++) colunas[x] /= n * alt;
+
+  const corte = (vals) => {
+    const ord = Array.from(vals).sort((p, q) => p - q);
+    const p90 = ord[Math.floor(ord.length * 0.9)];
+    if (p90 < 3) return null; // quase nada se mexe: não dá para afirmar nada
+    return maiorFaixa(vals, Math.max(2, p90 * 0.25));
+  };
+  const fy = corte(linhas), fx = corte(colunas);
+  if (!fy) return null;
+  const y0 = fy.ini / alt, y1 = (fy.fim + 1) / alt;
+  const x0 = fx ? fx.ini / larg : 0, x1 = fx ? (fx.fim + 1) / larg : 1;
+  // só recorta se sobrar uma faixa parada de verdade (≥ 12% da altura) e a cena for razoável
+  if (y1 - y0 > 0.88 || y1 - y0 < 0.2) return null;
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+async function detectarCena(arquivo, info) {
+  if (info.largura / info.altura > 0.75) return null; // já é deitado
+  const larg = AMOSTRA_LARGURA;
+  const alt = Math.max(2, Math.round((larg * info.altura) / info.largura / 2) * 2);
+  try {
+    const quadros = await lerQuadrosCinza(arquivo, info.duracao, larg, alt);
+    const r = analisarMovimento(quadros, larg, alt);
+    if (!r) return null;
+    // um respiro de 1 linha da amostra para dentro, para não pegar borda da faixa
+    const margemY = 1 / alt, margemX = r.w < 0.98 ? 1 / larg : 0;
+    const x = Math.round((r.x + margemX) * info.largura / 2) * 2;
+    const y = Math.round((r.y + margemY) * info.altura / 2) * 2;
+    const w = Math.round((r.w - 2 * margemX) * info.largura / 2) * 2;
+    const h = Math.round((r.h - 2 * margemY) * info.altura / 2) * 2;
+    if (w < 64 || h < 64 || w / h <= 0.75) return null; // cena recortada ainda em pé: usa tela cheia
+    return { x, y, w, h };
+  } catch (e) {
+    console.warn('[recorte-template] não consegui analisar a cena:', e.message);
+    return null;
+  }
+}
+
 const drawtext = (fonteArquivo, textfile, tamanho, cor, y) =>
   `drawtext=fontfile='${fonteArquivo}':textfile='${textfile}':expansion=none:fontsize=${tamanho}:fontcolor=${cor}` +
   `:x=${MARGEM_X}:y=${y}:shadowcolor=black@0.55:shadowx=0:shadowy=4`;
@@ -108,13 +212,16 @@ const drawtext = (fonteArquivo, textfile, tamanho, cor, y) =>
  * Monta o filtro do ffmpeg. Exportado para teste.
  * @returns {{ filtro: string, arquivosTexto: {caminho:string, texto:string}[], titulo: object }}
  */
-function montarFiltro({ largura, altura, titulo, subtitulo, prefixoTmp, fundo = 'blur' }) {
-  const deitado = largura / altura > 0.75; // tudo que não é praticamente vertical
+function montarFiltro({ largura, altura, titulo, subtitulo, prefixoTmp, fundo = 'blur', cena = null }) {
+  const deitado = !!cena || largura / altura > 0.75; // tudo que não é praticamente vertical
   const partes = [];
+  // cena embutida num vídeo em pé: recorta só ela e segue como vídeo deitado
+  const origem = cena ? '[src]' : '[0:v]';
+  if (cena) partes.push(`[0:v]crop=${cena.w}:${cena.h}:${cena.x}:${cena.y},setsar=1[src]`);
   if (deitado) {
     const fundoFiltro = fundo === 'preto'
-      ? `color=c=0x0E0D12:s=${W}x${H}[bg];[0:v]null[b]`
-      : `[0:v]split=2[a][b];[a]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=28,eq=brightness=-0.2:saturation=0.75[bg]`;
+      ? `color=c=0x0E0D12:s=${W}x${H}[bg];${origem}null[b]`
+      : `${origem}split=2[a][b];[a]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=28,eq=brightness=-0.2:saturation=0.75[bg]`;
     partes.push(fundoFiltro);
     partes.push(`[b]scale=w=${W}:h=${AREA_VIDEO_ALTURA}:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1[fg]`);
     partes.push(`[bg][fg]overlay=x=(W-w)/2:y=(H-h)/2:shortest=1[v1]`);
@@ -160,8 +267,9 @@ const recorteTemplate = async (req, res) => {
     const info = await sondar(entrada);
     const saida = path.join(path.dirname(entrada), `${path.basename(entrada, path.extname(entrada))}_recorte.mp4`);
     const prefixoTmp = path.join(path.dirname(entrada), `${path.basename(entrada, path.extname(entrada))}_txt`);
+    const cena = String(req.body?.detectarCena ?? 'true') === 'false' ? null : await detectarCena(entrada, info);
     const { filtro, arquivosTexto, titulo: t, deitado } = montarFiltro({
-      largura: info.largura, altura: info.altura, titulo, subtitulo, prefixoTmp, fundo,
+      largura: info.largura, altura: info.altura, titulo, subtitulo, prefixoTmp, fundo, cena,
     });
     for (const a of arquivosTexto) { fs.writeFileSync(a.caminho, a.texto, 'utf8'); temporarios.push(a.caminho); }
 
@@ -185,8 +293,9 @@ const recorteTemplate = async (req, res) => {
       success: true,
       message: 'Moldura Recorte de Cinema aplicada',
       file: path.basename(saida),
-      url: `${process.env.API_URL || 'http://localhost:3000'}/download/${path.basename(saida)}`,
-      layout: deitado ? 'video-centralizado-com-fundo' : 'tela-cheia',
+      url: `${(process.env.API_URL || 'http://localhost:3000').replace(/\/+$/, '')}/download/${path.basename(saida)}`,
+      layout: cena ? 'cena-recortada-com-fundo' : deitado ? 'video-centralizado-com-fundo' : 'tela-cheia',
+      cena,
       titulo: { linhas: t.linhas, tamanho: t.tamanho },
       duracao: info.duracao,
       executionTime: parseFloat(((Date.now() - inicio) / 1000).toFixed(2)),
@@ -199,4 +308,4 @@ const recorteTemplate = async (req, res) => {
   }
 };
 
-module.exports = { recorteTemplate, montarFiltro, montarTitulo };
+module.exports = { recorteTemplate, montarFiltro, montarTitulo, analisarMovimento, detectarCena };
