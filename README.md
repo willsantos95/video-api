@@ -40,7 +40,7 @@ quality: 23                      # CRF 16–35 (menor = melhor)
 
 - **Vídeo deitado ou quadrado:** fica inteiro no centro, com o próprio vídeo desfocado no fundo.
 - **Vídeo em pé com a cena deitada no meio** (faixas e legenda gravadas): a cena é detectada pelo movimento e recortada.
-- **Vídeo em pé de verdade:** ocupa a tela toda.
+- **Vídeo em pé de verdade (9:16):** no tema `animacao` entra inteiro numa janela sobre o fundo da marca, sem nada por cima da cena (`layoutVertical=tela-cheia` volta ao modo antigo); nos outros temas ocupa a tela toda.
 - Fontes em `assets/fonts` (SIL OFL). Para criar um tema novo, adicione uma entrada em `TEMAS` (`controllers/templateController.js`) e a moldura PNG transparente 1080x1920.
 
 **Resposta:**
