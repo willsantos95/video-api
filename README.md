@@ -15,29 +15,37 @@ API completa para edição de vídeos, criação de áudios e legendas com FFmpe
 
 #---
 
-## 🎬 Moldura Recorte de Cinema
+## 🎬 Molduras das páginas (Reels)
 
-Aplica a identidade visual do Recorte de Cinema e entrega o vídeo pronto para Reels (1080x1920, 30 fps).
+Aplica a identidade visual de uma página e entrega o vídeo pronto para Reels (1080x1920, 30 fps).
 
 ```bash
-POST /api/video/recorte-template
-Content-Type: multipart/form-data   (ou application/json com videoUrl)
+POST /api/video/moldura                 # mesmo que /api/video/recorte-template
+Content-Type: multipart/form-data       (ou application/json com videoUrl)
 
 video: [arquivo.mp4]            # ou videoUrl: "https://..."
-titulo: "Clube da Luta"          # obrigatório — vira caixa alta, 1 ou 2 linhas, tamanho automático
-subtitulo: "(1999) · Drama"      # opcional — em dourado, abaixo do título
+tema: "recorte"                  # recorte (padrão) | animacao | comedia
+titulo: "Clube da Luta"          # obrigatório — 1 ou 2 linhas, tamanho automático
+subtitulo: "(1999) · Drama"      # opcional — abaixo do título
 fundo: "blur"                    # blur (padrão) ou preto — só para vídeo deitado
+detectarCena: true               # false desliga o recorte da cena em vídeos já em pé
 quality: 23                      # CRF 16–35 (menor = melhor)
 ```
 
+| tema | página | título | subtítulo | moldura |
+|---|---|---|---|---|
+| `recorte` | Recorte de Cinema | Bebas Neue, caixa alta, marfim | Playfair itálico, dourado | `assets/recorte/moldura.png` |
+| `animacao` | Momento da Animação | Fredoka, creme com contorno azul-noite | Nunito Black, amarelo | `assets/animacao/moldura.png` |
+| `comedia` | Comédia Controversa | Bangers, caixa alta, amarelo com sombra vermelha | Inter ExtraBold, branco | `assets/comedia/moldura.png` |
+
 - **Vídeo deitado ou quadrado:** fica inteiro no centro, com o próprio vídeo desfocado no fundo.
-- **Vídeo em pé:** ocupa a tela toda.
-- Por cima vai `assets/recorte/moldura.png` (selo, cantos, degradês e "Siga @recorte.de.cinema").
-- Fontes em `assets/fonts` (SIL OFL).
+- **Vídeo em pé com a cena deitada no meio** (faixas e legenda gravadas): a cena é detectada pelo movimento e recortada.
+- **Vídeo em pé de verdade:** ocupa a tela toda.
+- Fontes em `assets/fonts` (SIL OFL). Para criar um tema novo, adicione uma entrada em `TEMAS` (`controllers/templateController.js`) e a moldura PNG transparente 1080x1920.
 
 **Resposta:**
 ```json
-{ "success": true, "file": "..._recorte.mp4", "url": "https://.../download/..._recorte.mp4",
+{ "success": true, "tema": "recorte", "file": "..._recorte.mp4", "url": "https://.../download/..._recorte.mp4",
   "layout": "video-centralizado-com-fundo", "titulo": { "linhas": ["CLUBE DA LUTA"], "tamanho": 120 } }
 ```
 

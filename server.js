@@ -53,6 +53,7 @@ app.post('/api/video/add-footer', upload.single('video'), videoController.addFoo
 app.post('/api/video/info', upload.single('video'), videoController.getVideoInfo);
 // Moldura da identidade Recorte de Cinema (Reels 1080x1920 com título)
 app.post('/api/video/recorte-template', upload.single('video'), templateController.recorteTemplate);
+app.post('/api/video/moldura', upload.single('video'), templateController.recorteTemplate); // tema=recorte|animacao|comedia
 app.post('/api/video/detect-logo', upload.fields([{ name: 'video' }, { name: 'logo' }]), logoDetectionController.detectLogo);
 
 // Rotas de áudio
