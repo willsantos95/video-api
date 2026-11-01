@@ -5,7 +5,8 @@
 // Composição:
 //   - vídeo deitado/quadrado: fundo com o próprio vídeo desfocado + vídeo inteiro no centro
 //   - vídeo em pé com a cena deitada no meio: recorta a cena e segue como deitado
-//   - vídeo em pé de verdade: preenche a tela (corta as sobras)
+//   - vídeo em pé de verdade: preenche a tela (corta as sobras) ou, se o tema tiver layout
+//     vertical, entra inteiro numa "janela" sobre um fundo da marca (moldura própria)
 //   - por cima: assets/<tema>/moldura.png (degradês, selo, enfeites e rodapé)
 //   - título e subtítulo escritos com drawtext, com quebra de linha e tamanho automáticos
 
@@ -31,6 +32,13 @@ const TEMAS = {
   animacao: {
     moldura: path.join(ASSETS, 'animacao', 'moldura.png'),
     topo: 225,
+    // vídeo 9:16: inteiro dentro da janela, sem nada por cima da cena
+    vertical: {
+      fundo: path.join(ASSETS, 'animacao', 'fundo-vertical.png'),
+      moldura: path.join(ASSETS, 'animacao', 'moldura-vertical.png'),
+      caixa: { x: 207, y: 530, w: 666, h: 1184 },
+      topo: 182,
+    },
     titulo: { fonte: fonteArq('Fredoka-Bold.ttf'), cor: '0xFFF4E0', max: 104, min: 64, caixaAlta: false, alturaLinha: 1.08,
       borda: { largura: 7, cor: '0x1E2A5A' }, sombra: { cor: '0xFF7A3D', x: 0, y: 7 } },
     subtitulo: { fonte: fonteArq('Nunito-Black.ttf'), cor: '0xFFC93C', tamanho: 46, espaco: 18, borda: { largura: 5, cor: '0x1E2A5A' } },
@@ -248,8 +256,10 @@ function drawtext(estilo, textfile, tamanho, y) {
  * Monta o filtro do ffmpeg. Exportado para teste.
  * @returns {{ filtro: string, arquivosTexto: {caminho:string, texto:string}[], titulo: object }}
  */
-function montarFiltro({ largura, altura, titulo, subtitulo, prefixoTmp, fundo = 'blur', cena = null, tema = pegarTema('recorte') }) {
+function montarFiltro({ largura, altura, titulo, subtitulo, prefixoTmp, fundo = 'blur', cena = null, tema = pegarTema('recorte'), vertical = true }) {
   const deitado = !!cena || largura / altura > 0.75; // tudo que não é praticamente vertical
+  const janela = !deitado && vertical && tema.vertical ? tema.vertical : null;
+  const topo = janela ? janela.topo : tema.topo;
   const partes = [];
   // cena embutida num vídeo em pé: recorta só ela e segue como vídeo deitado
   const origem = cena ? '[src]' : '[0:v]';
@@ -261,6 +271,12 @@ function montarFiltro({ largura, altura, titulo, subtitulo, prefixoTmp, fundo = 
     partes.push(fundoFiltro);
     partes.push(`[b]scale=w=${W}:h=${AREA_VIDEO_ALTURA}:force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1[fg]`);
     partes.push(`[bg][fg]overlay=x=(W-w)/2:y=(H-h)/2:shortest=1[v1]`);
+  } else if (janela) {
+    // entrada 2 = fundo da marca (imagem em loop)
+    const c = janela.caixa;
+    partes.push(`[0:v]scale=${c.w}:${c.h}:force_original_aspect_ratio=increase,crop=${c.w}:${c.h},setsar=1[fg]`);
+    partes.push(`[2:v]scale=${W}:${H},setsar=1[bg]`);
+    partes.push(`[bg][fg]overlay=x=${c.x}:y=${c.y}:shortest=1[v1]`);
   } else {
     partes.push(`[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1[v1]`);
   }
@@ -273,7 +289,7 @@ function montarFiltro({ largura, altura, titulo, subtitulo, prefixoTmp, fundo = 
   t.linhas.forEach((linha, i) => {
     const caminho = `${prefixoTmp}_t${i}.txt`;
     arquivosTexto.push({ caminho, texto: linha });
-    textos.push(drawtext(tema.titulo, caminho, t.tamanho, tema.topo + i * altLinha));
+    textos.push(drawtext(tema.titulo, caminho, t.tamanho, topo + i * altLinha));
   });
   const sub = String(subtitulo || '').replace(/\s+/g, ' ').trim();
   if (sub) {
@@ -281,10 +297,10 @@ function montarFiltro({ largura, altura, titulo, subtitulo, prefixoTmp, fundo = 
     const caminho = `${prefixoTmp}_s.txt`;
     const larguraSub = LARGURA_TEXTO - (st.borda ? st.borda.largura * 2 : 0);
     arquivosTexto.push({ caminho, texto: encurtar(st.fonte, sub, st.tamanho, larguraSub) });
-    textos.push(drawtext(st, caminho, st.tamanho, tema.topo + t.linhas.length * altLinha + st.espaco));
+    textos.push(drawtext(st, caminho, st.tamanho, topo + t.linhas.length * altLinha + st.espaco));
   }
   partes.push(`[v2]${textos.join(',')},fps=30,format=yuv420p[out]`);
-  return { filtro: partes.join(';'), arquivosTexto, titulo: t, deitado };
+  return { filtro: partes.join(';'), arquivosTexto, titulo: t, deitado, janela: !!janela, molduraArq: janela ? janela.moldura : tema.moldura, fundoArq: janela ? janela.fundo : null };
 }
 
 const recorteTemplate = async (req, res) => {
@@ -308,8 +324,9 @@ const recorteTemplate = async (req, res) => {
     const saida = path.join(path.dirname(entrada), `${path.basename(entrada, path.extname(entrada))}_recorte.mp4`);
     const prefixoTmp = path.join(path.dirname(entrada), `${path.basename(entrada, path.extname(entrada))}_txt`);
     const cena = String(req.body?.detectarCena ?? 'true') === 'false' ? null : await detectarCena(entrada, info);
-    const { filtro, arquivosTexto, titulo: t, deitado } = montarFiltro({
-      largura: info.largura, altura: info.altura, titulo, subtitulo, prefixoTmp, fundo, cena, tema,
+    const vertical = String(req.body?.layoutVertical ?? 'janela') !== 'tela-cheia';
+    const { filtro, arquivosTexto, titulo: t, deitado, janela, molduraArq, fundoArq } = montarFiltro({
+      largura: info.largura, altura: info.altura, titulo, subtitulo, prefixoTmp, fundo, cena, tema, vertical,
     });
     for (const a of arquivosTexto) { fs.writeFileSync(a.caminho, a.texto, 'utf8'); temporarios.push(a.caminho); }
 
@@ -319,8 +336,9 @@ const recorteTemplate = async (req, res) => {
     if (info.temAudio) opcoes.push('-map', '0:a:0', '-c:a', 'aac', '-b:a', '128k');
 
     await new Promise((ok, falha) => {
-      ffmpeg(entrada)
-        .input(tema.moldura).inputOptions(['-loop', '1'])
+      const cmd = ffmpeg(entrada).input(molduraArq).inputOptions(['-loop', '1']);
+      if (fundoArq) cmd.input(fundoArq).inputOptions(['-loop', '1']);
+      cmd
         .complexFilter(filtro)
         .outputOptions([...opcoes, '-shortest'])
         .output(saida)
@@ -335,7 +353,7 @@ const recorteTemplate = async (req, res) => {
       tema: tema.nome,
       file: path.basename(saida),
       url: `${(process.env.API_URL || 'http://localhost:3000').replace(/\/+$/, '')}/download/${path.basename(saida)}`,
-      layout: cena ? 'cena-recortada-com-fundo' : deitado ? 'video-centralizado-com-fundo' : 'tela-cheia',
+      layout: cena ? 'cena-recortada-com-fundo' : deitado ? 'video-centralizado-com-fundo' : janela ? 'vertical-na-janela' : 'tela-cheia',
       cena,
       titulo: { linhas: t.linhas, tamanho: t.tamanho },
       duracao: info.duracao,
